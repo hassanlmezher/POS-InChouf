@@ -1,53 +1,48 @@
 {
-  "id": "6fa13fd9-57e7-48d3-a425-942b18114d48",
-  "prevId": "3341b7d8-b8b1-443c-81a1-c1c3b00613c1",
-  "version": "6",
-  "dialect": "sqlite",
+  "id": "ea0cb771-8ad1-47dd-8cd8-851b5dc071dc",
+  "prevId": "aafc04d7-9f58-4121-8307-f0c9fae0b131",
+  "version": "7",
+  "dialect": "postgresql",
   "tables": {
-    "events": {
+    "public.events": {
       "name": "events",
+      "schema": "",
       "columns": {
         "id": {
           "name": "id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
-        "tenantId": {
-          "name": "tenantId",
+        "tenantid": {
+          "name": "tenantid",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
-        "orderId": {
-          "name": "orderId",
+        "orderid": {
+          "name": "orderid",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "actor": {
           "name": "actor",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "action": {
           "name": "action",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "detail": {
           "name": "detail",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": "''"
         },
         "public": {
@@ -55,215 +50,225 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": 0
         },
-        "createdAt": {
-          "name": "createdAt",
+        "createdat": {
+          "name": "createdat",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         }
       },
       "indexes": {
         "events_order": {
           "name": "events_order",
           "columns": [
-            "tenantId",
-            "orderId"
+            {
+              "expression": "tenantid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "orderid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": false
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
-        "events_tenantId_tenants_id_fk": {
-          "name": "events_tenantId_tenants_id_fk",
+        "events_tenantid_tenants_id_fk": {
+          "name": "events_tenantid_tenants_id_fk",
           "tableFrom": "events",
-          "columnsFrom": [
-            "tenantId"
-          ],
           "tableTo": "tenants",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
-        },
-        "events_tenantId_orderId_orders_tenantId_id_fk": {
-          "name": "events_tenantId_orderId_orders_tenantId_id_fk",
-          "tableFrom": "events",
           "columnsFrom": [
-            "tenantId",
-            "orderId"
+            "tenantid"
           ],
-          "tableTo": "orders",
           "columnsTo": [
-            "tenantId",
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "events_tenantid_orderid_orders_tenantid_id_fk": {
+          "name": "events_tenantid_orderid_orders_tenantid_id_fk",
+          "tableFrom": "events",
+          "tableTo": "orders",
+          "columnsFrom": [
+            "tenantid",
+            "orderid"
+          ],
+          "columnsTo": [
+            "tenantid",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
-    "files": {
+    "public.files": {
       "name": "files",
+      "schema": "",
       "columns": {
         "id": {
           "name": "id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
-        "tenantId": {
-          "name": "tenantId",
+        "tenantid": {
+          "name": "tenantid",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
-        "orderId": {
-          "name": "orderId",
+        "orderid": {
+          "name": "orderid",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "name": {
           "name": "name",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "type": {
           "name": "type",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "size": {
           "name": "size",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
-        "createdAt": {
-          "name": "createdAt",
+        "createdat": {
+          "name": "createdat",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         }
       },
       "indexes": {
         "files_tenant": {
           "name": "files_tenant",
           "columns": [
-            "tenantId"
+            {
+              "expression": "tenantid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": false
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
-        "files_tenantId_tenants_id_fk": {
-          "name": "files_tenantId_tenants_id_fk",
+        "files_tenantid_tenants_id_fk": {
+          "name": "files_tenantid_tenants_id_fk",
           "tableFrom": "files",
-          "columnsFrom": [
-            "tenantId"
-          ],
           "tableTo": "tenants",
-          "columnsTo": [
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
-        },
-        "files_tenantId_orderId_orders_tenantId_id_fk": {
-          "name": "files_tenantId_orderId_orders_tenantId_id_fk",
-          "tableFrom": "files",
           "columnsFrom": [
-            "tenantId",
-            "orderId"
+            "tenantid"
           ],
-          "tableTo": "orders",
           "columnsTo": [
-            "tenantId",
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "files_tenantid_orderid_orders_tenantid_id_fk": {
+          "name": "files_tenantid_orderid_orders_tenantid_id_fk",
+          "tableFrom": "files",
+          "tableTo": "orders",
+          "columnsFrom": [
+            "tenantid",
+            "orderid"
+          ],
+          "columnsTo": [
+            "tenantid",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
-    "items": {
+    "public.items": {
       "name": "items",
+      "schema": "",
       "columns": {
         "id": {
           "name": "id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
-        "tenantId": {
-          "name": "tenantId",
+        "tenantid": {
+          "name": "tenantid",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
-        "orderId": {
-          "name": "orderId",
+        "orderid": {
+          "name": "orderid",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
-        "productId": {
-          "name": "productId",
+        "productid": {
+          "name": "productid",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "name": {
           "name": "name",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "quantity": {
           "name": "quantity",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "price": {
           "name": "price",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "variant": {
           "name": "variant",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": "''"
         },
         "custom": {
@@ -271,7 +276,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": "'{}'"
         }
       },
@@ -279,150 +283,157 @@
         "items_order": {
           "name": "items_order",
           "columns": [
-            "tenantId",
-            "orderId"
+            {
+              "expression": "tenantid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "orderid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": false
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
-        "items_tenantId_orderId_orders_tenantId_id_fk": {
-          "name": "items_tenantId_orderId_orders_tenantId_id_fk",
+        "items_tenantid_orderid_orders_tenantid_id_fk": {
+          "name": "items_tenantid_orderid_orders_tenantid_id_fk",
           "tableFrom": "items",
-          "columnsFrom": [
-            "tenantId",
-            "orderId"
-          ],
           "tableTo": "orders",
-          "columnsTo": [
-            "tenantId",
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
-        },
-        "items_tenantId_productId_products_tenantId_id_fk": {
-          "name": "items_tenantId_productId_products_tenantId_id_fk",
-          "tableFrom": "items",
           "columnsFrom": [
-            "tenantId",
-            "productId"
+            "tenantid",
+            "orderid"
           ],
-          "tableTo": "products",
           "columnsTo": [
-            "tenantId",
+            "tenantid",
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "items_tenantid_productid_products_tenantid_id_fk": {
+          "name": "items_tenantid_productid_products_tenantid_id_fk",
+          "tableFrom": "items",
+          "tableTo": "products",
+          "columnsFrom": [
+            "tenantid",
+            "productid"
+          ],
+          "columnsTo": [
+            "tenantid",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
+      "policies": {},
       "checkConstraints": {
         "quantity_positive": {
           "name": "quantity_positive",
           "value": "\"items\".\"quantity\">0"
         }
-      }
+      },
+      "isRLSEnabled": false
     },
-    "limits": {
+    "public.limits": {
       "name": "limits",
+      "schema": "",
       "columns": {
         "key": {
           "name": "key",
           "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "count": {
           "name": "count",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "expires": {
           "name": "expires",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         }
       },
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
-    "orders": {
+    "public.orders": {
       "name": "orders",
+      "schema": "",
       "columns": {
         "id": {
           "name": "id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
-        "tenantId": {
-          "name": "tenantId",
+        "tenantid": {
+          "name": "tenantid",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "reference": {
           "name": "reference",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "customer": {
           "name": "customer",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "phone": {
           "name": "phone",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "email": {
           "name": "email",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": "''"
         },
         "address": {
           "name": "address",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
-        "zoneId": {
-          "name": "zoneId",
+        "zoneid": {
+          "name": "zoneid",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "status": {
           "name": "status",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": "'New'"
         },
         "payment": {
@@ -430,74 +441,64 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": "'Unpaid'"
         },
-        "paymentMethod": {
-          "name": "paymentMethod",
+        "paymentmethod": {
+          "name": "paymentmethod",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": "'Cash on delivery'"
         },
         "subtotal": {
           "name": "subtotal",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
-        "deliveryFee": {
-          "name": "deliveryFee",
+        "deliveryfee": {
+          "name": "deliveryfee",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "total": {
           "name": "total",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "notes": {
           "name": "notes",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": "''"
         },
-        "employeeId": {
-          "name": "employeeId",
+        "employeeid": {
+          "name": "employeeid",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
-        "driverId": {
-          "name": "driverId",
+        "driverid": {
+          "name": "driverid",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
-        "deliveryStatus": {
-          "name": "deliveryStatus",
+        "deliverystatus": {
+          "name": "deliverystatus",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": "'Pending'"
         },
-        "cashCollected": {
-          "name": "cashCollected",
+        "cashcollected": {
+          "name": "cashcollected",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": 0
         },
         "reason": {
@@ -505,219 +506,255 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": "''"
         },
-        "trackingHash": {
-          "name": "trackingHash",
+        "trackinghash": {
+          "name": "trackinghash",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "idempotency": {
           "name": "idempotency",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "version": {
           "name": "version",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": 0
         },
-        "createdAt": {
-          "name": "createdAt",
+        "createdat": {
+          "name": "createdat",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
-        "updatedAt": {
-          "name": "updatedAt",
+        "updatedat": {
+          "name": "updatedat",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         }
       },
       "indexes": {
-        "orders_trackingHash_unique": {
-          "name": "orders_trackingHash_unique",
-          "columns": [
-            "trackingHash"
-          ],
-          "isUnique": true
-        },
         "orders_tenant_id": {
           "name": "orders_tenant_id",
           "columns": [
-            "tenantId",
-            "id"
+            {
+              "expression": "tenantid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": true
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "orders_idempotency": {
           "name": "orders_idempotency",
           "columns": [
-            "tenantId",
-            "idempotency"
+            {
+              "expression": "tenantid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "idempotency",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": true
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "orders_queue": {
           "name": "orders_queue",
           "columns": [
-            "tenantId",
-            "status",
-            "createdAt"
+            {
+              "expression": "tenantid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "createdat",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": false
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
-        "orders_tenantId_tenants_id_fk": {
-          "name": "orders_tenantId_tenants_id_fk",
+        "orders_tenantid_tenants_id_fk": {
+          "name": "orders_tenantid_tenants_id_fk",
           "tableFrom": "orders",
-          "columnsFrom": [
-            "tenantId"
-          ],
           "tableTo": "tenants",
+          "columnsFrom": [
+            "tenantid"
+          ],
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
-        "orders_tenantId_zoneId_zones_tenantId_id_fk": {
-          "name": "orders_tenantId_zoneId_zones_tenantId_id_fk",
+        "orders_tenantid_zoneid_zones_tenantid_id_fk": {
+          "name": "orders_tenantid_zoneid_zones_tenantid_id_fk",
           "tableFrom": "orders",
-          "columnsFrom": [
-            "tenantId",
-            "zoneId"
-          ],
           "tableTo": "zones",
-          "columnsTo": [
-            "tenantId",
-            "id"
-          ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
-        },
-        "orders_tenantId_employeeId_users_tenantId_id_fk": {
-          "name": "orders_tenantId_employeeId_users_tenantId_id_fk",
-          "tableFrom": "orders",
           "columnsFrom": [
-            "tenantId",
-            "employeeId"
+            "tenantid",
+            "zoneid"
           ],
-          "tableTo": "users",
           "columnsTo": [
-            "tenantId",
+            "tenantid",
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         },
-        "orders_tenantId_driverId_users_tenantId_id_fk": {
-          "name": "orders_tenantId_driverId_users_tenantId_id_fk",
+        "orders_tenantid_employeeid_users_tenantid_id_fk": {
+          "name": "orders_tenantid_employeeid_users_tenantid_id_fk",
           "tableFrom": "orders",
-          "columnsFrom": [
-            "tenantId",
-            "driverId"
-          ],
           "tableTo": "users",
+          "columnsFrom": [
+            "tenantid",
+            "employeeid"
+          ],
           "columnsTo": [
-            "tenantId",
+            "tenantid",
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "orders_tenantid_driverid_users_tenantid_id_fk": {
+          "name": "orders_tenantid_driverid_users_tenantid_id_fk",
+          "tableFrom": "orders",
+          "tableTo": "users",
+          "columnsFrom": [
+            "tenantid",
+            "driverid"
+          ],
+          "columnsTo": [
+            "tenantid",
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
+      "uniqueConstraints": {
+        "orders_trackinghash_unique": {
+          "name": "orders_trackinghash_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "trackinghash"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
-    "platformEvents": {
-      "name": "platformEvents",
+    "public.platformevents": {
+      "name": "platformevents",
+      "schema": "",
       "columns": {
         "id": {
           "name": "id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "actor": {
           "name": "actor",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "action": {
           "name": "action",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "detail": {
           "name": "detail",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
-        "createdAt": {
-          "name": "createdAt",
+        "createdat": {
+          "name": "createdat",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         }
       },
       "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
-    "products": {
+    "public.products": {
       "name": "products",
+      "schema": "",
       "columns": {
         "id": {
           "name": "id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
-        "tenantId": {
-          "name": "tenantId",
+        "tenantid": {
+          "name": "tenantid",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "name": {
           "name": "name",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "description": {
           "name": "description",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": "''"
         },
         "category": {
@@ -725,36 +762,31 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": "'General'"
         },
         "sku": {
           "name": "sku",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "price": {
           "name": "price",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "stock": {
           "name": "stock",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
-        "lowStock": {
-          "name": "lowStock",
+        "lowstock": {
+          "name": "lowstock",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": 5
         },
         "active": {
@@ -762,7 +794,6 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": 1
         },
         "image": {
@@ -770,7 +801,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": "''"
         },
         "variants": {
@@ -778,60 +808,84 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": "'[]'"
         },
-        "customFields": {
-          "name": "customFields",
+        "customfields": {
+          "name": "customfields",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": "'[]'"
         },
-        "createdAt": {
-          "name": "createdAt",
+        "createdat": {
+          "name": "createdat",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         }
       },
       "indexes": {
         "products_tenant_id": {
           "name": "products_tenant_id",
           "columns": [
-            "tenantId",
-            "id"
+            {
+              "expression": "tenantid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": true
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         },
         "products_tenant_sku": {
           "name": "products_tenant_sku",
           "columns": [
-            "tenantId",
-            "sku"
+            {
+              "expression": "tenantid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "sku",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": true
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
-        "products_tenantId_tenants_id_fk": {
-          "name": "products_tenantId_tenants_id_fk",
+        "products_tenantid_tenants_id_fk": {
+          "name": "products_tenantid_tenants_id_fk",
           "tableFrom": "products",
-          "columnsFrom": [
-            "tenantId"
-          ],
           "tableTo": "tenants",
+          "columnsFrom": [
+            "tenantid"
+          ],
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
+      "policies": {},
       "checkConstraints": {
         "stock_nonnegative": {
           "name": "stock_nonnegative",
@@ -841,52 +895,48 @@
           "name": "price_nonnegative",
           "value": "\"products\".\"price\" >= 0"
         }
-      }
+      },
+      "isRLSEnabled": false
     },
-    "proofs": {
+    "public.proofs": {
       "name": "proofs",
+      "schema": "",
       "columns": {
         "id": {
           "name": "id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
-        "tenantId": {
-          "name": "tenantId",
+        "tenantid": {
+          "name": "tenantid",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
-        "orderId": {
-          "name": "orderId",
+        "orderid": {
+          "name": "orderid",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "version": {
           "name": "version",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
-        "fileId": {
-          "name": "fileId",
+        "fileid": {
+          "name": "fileid",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "note": {
           "name": "note",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": "''"
         },
         "status": {
@@ -894,7 +944,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": "'Pending'"
         },
         "feedback": {
@@ -902,132 +951,155 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": "''"
         },
-        "createdAt": {
-          "name": "createdAt",
+        "createdat": {
+          "name": "createdat",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         }
       },
       "indexes": {
         "proof_version": {
           "name": "proof_version",
           "columns": [
-            "tenantId",
-            "orderId",
-            "version"
+            {
+              "expression": "tenantid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "orderid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "version",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": true
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
-        "proofs_tenantId_orderId_orders_tenantId_id_fk": {
-          "name": "proofs_tenantId_orderId_orders_tenantId_id_fk",
+        "proofs_tenantid_orderid_orders_tenantid_id_fk": {
+          "name": "proofs_tenantid_orderid_orders_tenantid_id_fk",
           "tableFrom": "proofs",
-          "columnsFrom": [
-            "tenantId",
-            "orderId"
-          ],
           "tableTo": "orders",
+          "columnsFrom": [
+            "tenantid",
+            "orderid"
+          ],
           "columnsTo": [
-            "tenantId",
+            "tenantid",
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
-    "sessions": {
+    "public.sessions": {
       "name": "sessions",
+      "schema": "",
       "columns": {
         "id": {
           "name": "id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
-        "userId": {
-          "name": "userId",
+        "userid": {
+          "name": "userid",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "expires": {
           "name": "expires",
-          "type": "integer",
+          "type": "bigint",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         }
       },
       "indexes": {
         "sessions_user": {
           "name": "sessions_user",
           "columns": [
-            "userId"
+            {
+              "expression": "userid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": false
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
-        "sessions_userId_users_id_fk": {
-          "name": "sessions_userId_users_id_fk",
+        "sessions_userid_users_id_fk": {
+          "name": "sessions_userid_users_id_fk",
           "tableFrom": "sessions",
-          "columnsFrom": [
-            "userId"
-          ],
           "tableTo": "users",
+          "columnsFrom": [
+            "userid"
+          ],
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
-    "tenants": {
+    "public.tenants": {
       "name": "tenants",
+      "schema": "",
       "columns": {
         "id": {
           "name": "id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "name": {
           "name": "name",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "slug": {
           "name": "slug",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "active": {
           "name": "active",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": 1
         },
         "plan": {
@@ -1035,7 +1107,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": "'Starter'"
         },
         "price": {
@@ -1043,7 +1114,6 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": 2000
         },
         "subscription": {
@@ -1051,208 +1121,201 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": "'trial'"
         },
-        "trialStart": {
-          "name": "trialStart",
+        "trialstart": {
+          "name": "trialstart",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
-        "trialEnd": {
-          "name": "trialEnd",
+        "trialend": {
+          "name": "trialend",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
-        "renewalDate": {
-          "name": "renewalDate",
+        "renewaldate": {
+          "name": "renewaldate",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
-        "suspendedDate": {
-          "name": "suspendedDate",
+        "suspendeddate": {
+          "name": "suspendeddate",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "settings": {
           "name": "settings",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": "'{}'"
         },
-        "createdAt": {
-          "name": "createdAt",
+        "createdat": {
+          "name": "createdat",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         }
       },
-      "indexes": {
-        "tenants_slug_unique": {
-          "name": "tenants_slug_unique",
-          "columns": [
-            "slug"
-          ],
-          "isUnique": true
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
+      "uniqueConstraints": {
+        "tenants_slug_unique": {
+          "name": "tenants_slug_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "slug"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
-    "users": {
+    "public.users": {
       "name": "users",
+      "schema": "",
       "columns": {
         "id": {
           "name": "id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
-        "tenantId": {
-          "name": "tenantId",
+        "tenantid": {
+          "name": "tenantid",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "email": {
           "name": "email",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "name": {
           "name": "name",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "role": {
           "name": "role",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "password": {
-          "name": "password",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "active": {
           "name": "active",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": 1
         },
-        "createdAt": {
-          "name": "createdAt",
+        "createdat": {
+          "name": "createdat",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         }
       },
       "indexes": {
-        "users_email_unique": {
-          "name": "users_email_unique",
-          "columns": [
-            "email"
-          ],
-          "isUnique": true
-        },
         "users_tenant_id": {
           "name": "users_tenant_id",
           "columns": [
-            "tenantId",
-            "id"
+            {
+              "expression": "tenantid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": true
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
-        "users_tenantId_tenants_id_fk": {
-          "name": "users_tenantId_tenants_id_fk",
+        "users_tenantid_tenants_id_fk": {
+          "name": "users_tenantid_tenants_id_fk",
           "tableFrom": "users",
-          "columnsFrom": [
-            "tenantId"
-          ],
           "tableTo": "tenants",
+          "columnsFrom": [
+            "tenantid"
+          ],
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
+      "uniqueConstraints": {
+        "users_email_unique": {
+          "name": "users_email_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     },
-    "zones": {
+    "public.zones": {
       "name": "zones",
+      "schema": "",
       "columns": {
         "id": {
           "name": "id",
           "type": "text",
           "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
-        "tenantId": {
-          "name": "tenantId",
+        "tenantid": {
+          "name": "tenantid",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "name": {
           "name": "name",
           "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
         "fee": {
           "name": "fee",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
+          "notNull": true
         },
-        "freeAbove": {
-          "name": "freeAbove",
+        "freeabove": {
+          "name": "freeabove",
           "type": "integer",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": false
         },
         "minimum": {
           "name": "minimum",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": 0
         },
         "active": {
@@ -1260,7 +1323,6 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": 1
         },
         "notes": {
@@ -1268,7 +1330,6 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "autoincrement": false,
           "default": "''"
         }
       },
@@ -1276,40 +1337,56 @@
         "zones_tenant_id": {
           "name": "zones_tenant_id",
           "columns": [
-            "tenantId",
-            "id"
+            {
+              "expression": "tenantid",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
           ],
-          "isUnique": true
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
-        "zones_tenantId_tenants_id_fk": {
-          "name": "zones_tenantId_tenants_id_fk",
+        "zones_tenantid_tenants_id_fk": {
+          "name": "zones_tenantid_tenants_id_fk",
           "tableFrom": "zones",
-          "columnsFrom": [
-            "tenantId"
-          ],
           "tableTo": "tenants",
+          "columnsFrom": [
+            "tenantid"
+          ],
           "columnsTo": [
             "id"
           ],
-          "onUpdate": "no action",
-          "onDelete": "no action"
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
-      "checkConstraints": {}
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
     }
   },
-  "views": {},
   "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
   "_meta": {
     "columns": {},
     "schemas": {},
     "tables": {}
-  },
-  "internal": {
-    "indexes": {}
   }
 }

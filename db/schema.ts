@@ -1,72 +1,72 @@
 import {
-  sqliteTable,
+  pgTable,
   text,
   integer,
+  bigint,
   uniqueIndex,
   index,
   foreignKey,
   check,
-} from 'drizzle-orm/sqlite-core';
+} from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
-export const tenants = sqliteTable('tenants', {
-  id: text().primaryKey(),
-  name: text().notNull(),
-  slug: text().notNull().unique(),
-  active: integer().notNull().default(1),
-  plan: text().notNull().default('Starter'),
-  price: integer().notNull().default(2000),
-  subscription: text().notNull().default('trial'),
-  trialStart: text(),
-  trialEnd: text(),
-  renewalDate: text(),
-  suspendedDate: text(),
-  settings: text().notNull().default('{}'),
-  createdAt: text().notNull(),
+export const tenants = pgTable('tenants', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  slug: text('slug').notNull().unique(),
+  active: integer('active').notNull().default(1),
+  plan: text('plan').notNull().default('Starter'),
+  price: integer('price').notNull().default(2000),
+  subscription: text('subscription').notNull().default('trial'),
+  trialStart: text('trialstart'),
+  trialEnd: text('trialend'),
+  renewalDate: text('renewaldate'),
+  suspendedDate: text('suspendeddate'),
+  settings: text('settings').notNull().default('{}'),
+  createdAt: text('createdat').notNull(),
 });
-export const users = sqliteTable(
+export const users = pgTable(
   'users',
   {
-    id: text().primaryKey(),
-    tenantId: text().references(() => tenants.id),
-    email: text().notNull().unique(),
-    name: text().notNull(),
-    role: text().notNull(),
-    password: text().notNull(),
-    active: integer().notNull().default(1),
-    createdAt: text().notNull(),
+    id: text('id').primaryKey(),
+    tenantId: text('tenantid').references(() => tenants.id),
+    email: text('email').notNull().unique(),
+    name: text('name').notNull(),
+    role: text('role').notNull(),
+    active: integer('active').notNull().default(1),
+    createdAt: text('createdat').notNull(),
   },
   (t) => [uniqueIndex('users_tenant_id').on(t.tenantId, t.id)],
 );
-export const sessions = sqliteTable(
+export const sessions = pgTable(
   'sessions',
   {
-    id: text().primaryKey(),
-    userId: text()
+    id: text('id').primaryKey(),
+    userId: text('userid')
       .notNull()
       .references(() => users.id),
-    expires: integer().notNull(),
+    expires: bigint('expires', { mode: 'number' }).notNull(),
   },
   (t) => [index('sessions_user').on(t.userId)],
 );
-export const products = sqliteTable(
+export const products = pgTable(
   'products',
   {
-    id: text().primaryKey(),
-    tenantId: text()
+    id: text('id').primaryKey(),
+    tenantId: text('tenantid')
       .notNull()
       .references(() => tenants.id),
-    name: text().notNull(),
-    description: text().notNull().default(''),
-    category: text().notNull().default('General'),
-    sku: text().notNull(),
-    price: integer().notNull(),
-    stock: integer().notNull(),
-    lowStock: integer().notNull().default(5),
-    active: integer().notNull().default(1),
-    image: text().notNull().default(''),
-    variants: text().notNull().default('[]'),
-    customFields: text().notNull().default('[]'),
-    createdAt: text().notNull(),
+    name: text('name').notNull(),
+    description: text('description').notNull().default(''),
+    category: text('category').notNull().default('General'),
+    sku: text('sku').notNull(),
+    price: integer('price').notNull(),
+    stock: integer('stock').notNull(),
+    lowStock: integer('lowstock').notNull().default(5),
+    active: integer('active').notNull().default(1),
+    image: text('image').notNull().default(''),
+    variants: text('variants').notNull().default('[]'),
+    customFields: text('customfields').notNull().default('[]'),
+    createdAt: text('createdat').notNull(),
   },
   (t) => [
     uniqueIndex('products_tenant_id').on(t.tenantId, t.id),
@@ -75,52 +75,52 @@ export const products = sqliteTable(
     check('price_nonnegative', sql`${t.price} >= 0`),
   ],
 );
-export const zones = sqliteTable(
+export const zones = pgTable(
   'zones',
   {
-    id: text().primaryKey(),
-    tenantId: text()
+    id: text('id').primaryKey(),
+    tenantId: text('tenantid')
       .notNull()
       .references(() => tenants.id),
-    name: text().notNull(),
-    fee: integer().notNull(),
-    freeAbove: integer(),
-    minimum: integer().notNull().default(0),
-    active: integer().notNull().default(1),
-    notes: text().notNull().default(''),
+    name: text('name').notNull(),
+    fee: integer('fee').notNull(),
+    freeAbove: integer('freeabove'),
+    minimum: integer('minimum').notNull().default(0),
+    active: integer('active').notNull().default(1),
+    notes: text('notes').notNull().default(''),
   },
   (t) => [uniqueIndex('zones_tenant_id').on(t.tenantId, t.id)],
 );
-export const orders = sqliteTable(
+export const orders = pgTable(
   'orders',
   {
-    id: text().primaryKey(),
-    tenantId: text()
+    id: text('id').primaryKey(),
+    tenantId: text('tenantid')
       .notNull()
       .references(() => tenants.id),
-    reference: text().notNull(),
-    customer: text().notNull(),
-    phone: text().notNull(),
-    email: text().notNull().default(''),
-    address: text().notNull(),
-    zoneId: text().notNull(),
-    status: text().notNull().default('New'),
-    payment: text().notNull().default('Unpaid'),
-    paymentMethod: text().notNull().default('Cash on delivery'),
-    subtotal: integer().notNull(),
-    deliveryFee: integer().notNull(),
-    total: integer().notNull(),
-    notes: text().notNull().default(''),
-    employeeId: text(),
-    driverId: text(),
-    deliveryStatus: text().notNull().default('Pending'),
-    cashCollected: integer().notNull().default(0),
-    reason: text().notNull().default(''),
-    trackingHash: text().unique(),
-    idempotency: text().notNull(),
-    version: integer().notNull().default(0),
-    createdAt: text().notNull(),
-    updatedAt: text().notNull(),
+    reference: text('reference').notNull(),
+    customer: text('customer').notNull(),
+    phone: text('phone').notNull(),
+    email: text('email').notNull().default(''),
+    address: text('address').notNull(),
+    zoneId: text('zoneid').notNull(),
+    status: text('status').notNull().default('New'),
+    payment: text('payment').notNull().default('Unpaid'),
+    paymentMethod: text('paymentmethod').notNull().default('Cash on delivery'),
+    subtotal: integer('subtotal').notNull(),
+    deliveryFee: integer('deliveryfee').notNull(),
+    total: integer('total').notNull(),
+    notes: text('notes').notNull().default(''),
+    employeeId: text('employeeid'),
+    driverId: text('driverid'),
+    deliveryStatus: text('deliverystatus').notNull().default('Pending'),
+    cashCollected: integer('cashcollected').notNull().default(0),
+    reason: text('reason').notNull().default(''),
+    trackingHash: text('trackinghash').unique(),
+    idempotency: text('idempotency').notNull(),
+    version: integer('version').notNull().default(0),
+    createdAt: text('createdat').notNull(),
+    updatedAt: text('updatedat').notNull(),
   },
   (t) => [
     uniqueIndex('orders_tenant_id').on(t.tenantId, t.id),
@@ -140,18 +140,18 @@ export const orders = sqliteTable(
     }),
   ],
 );
-export const items = sqliteTable(
+export const items = pgTable(
   'items',
   {
-    id: text().primaryKey(),
-    tenantId: text().notNull(),
-    orderId: text().notNull(),
-    productId: text().notNull(),
-    name: text().notNull(),
-    quantity: integer().notNull(),
-    price: integer().notNull(),
-    variant: text().notNull().default(''),
-    custom: text().notNull().default('{}'),
+    id: text('id').primaryKey(),
+    tenantId: text('tenantid').notNull(),
+    orderId: text('orderid').notNull(),
+    productId: text('productid').notNull(),
+    name: text('name').notNull(),
+    quantity: integer('quantity').notNull(),
+    price: integer('price').notNull(),
+    variant: text('variant').notNull().default(''),
+    custom: text('custom').notNull().default('{}'),
   },
   (t) => [
     index('items_order').on(t.tenantId, t.orderId),
@@ -166,19 +166,19 @@ export const items = sqliteTable(
     check('quantity_positive', sql`${t.quantity}>0`),
   ],
 );
-export const events = sqliteTable(
+export const events = pgTable(
   'events',
   {
-    id: text().primaryKey(),
-    tenantId: text()
+    id: text('id').primaryKey(),
+    tenantId: text('tenantid')
       .notNull()
       .references(() => tenants.id),
-    orderId: text(),
-    actor: text().notNull(),
-    action: text().notNull(),
-    detail: text().notNull().default(''),
-    public: integer().notNull().default(0),
-    createdAt: text().notNull(),
+    orderId: text('orderid'),
+    actor: text('actor').notNull(),
+    action: text('action').notNull(),
+    detail: text('detail').notNull().default(''),
+    public: integer('public').notNull().default(0),
+    createdAt: text('createdat').notNull(),
   },
   (t) => [
     index('events_order').on(t.tenantId, t.orderId),
@@ -188,18 +188,18 @@ export const events = sqliteTable(
     }),
   ],
 );
-export const proofs = sqliteTable(
+export const proofs = pgTable(
   'proofs',
   {
-    id: text().primaryKey(),
-    tenantId: text().notNull(),
-    orderId: text().notNull(),
-    version: integer().notNull(),
-    fileId: text().notNull(),
-    note: text().notNull().default(''),
-    status: text().notNull().default('Pending'),
-    feedback: text().notNull().default(''),
-    createdAt: text().notNull(),
+    id: text('id').primaryKey(),
+    tenantId: text('tenantid').notNull(),
+    orderId: text('orderid').notNull(),
+    version: integer('version').notNull(),
+    fileId: text('fileid').notNull(),
+    note: text('note').notNull().default(''),
+    status: text('status').notNull().default('Pending'),
+    feedback: text('feedback').notNull().default(''),
+    createdAt: text('createdat').notNull(),
   },
   (t) => [
     uniqueIndex('proof_version').on(t.tenantId, t.orderId, t.version),
@@ -209,18 +209,18 @@ export const proofs = sqliteTable(
     }),
   ],
 );
-export const files = sqliteTable(
+export const files = pgTable(
   'files',
   {
-    id: text().primaryKey(),
-    tenantId: text()
+    id: text('id').primaryKey(),
+    tenantId: text('tenantid')
       .notNull()
       .references(() => tenants.id),
-    orderId: text(),
-    name: text().notNull(),
-    type: text().notNull(),
-    size: integer().notNull(),
-    createdAt: text().notNull(),
+    orderId: text('orderid'),
+    name: text('name').notNull(),
+    type: text('type').notNull(),
+    size: integer('size').notNull(),
+    createdAt: text('createdat').notNull(),
   },
   (t) => [
     index('files_tenant').on(t.tenantId),
@@ -230,15 +230,15 @@ export const files = sqliteTable(
     }),
   ],
 );
-export const limits = sqliteTable('limits', {
-  key: text().primaryKey(),
-  count: integer().notNull(),
-  expires: integer().notNull(),
+export const limits = pgTable('limits', {
+  key: text('key').primaryKey(),
+  count: integer('count').notNull(),
+  expires: bigint('expires', { mode: 'number' }).notNull(),
 });
-export const platformEvents = sqliteTable('platformEvents', {
-  id: text().primaryKey(),
-  actor: text().notNull(),
-  action: text().notNull(),
-  detail: text().notNull(),
-  createdAt: text().notNull(),
+export const platformEvents = pgTable('platformevents', {
+  id: text('id').primaryKey(),
+  actor: text('actor').notNull(),
+  action: text('action').notNull(),
+  detail: text('detail').notNull(),
+  createdAt: text('createdat').notNull(),
 });

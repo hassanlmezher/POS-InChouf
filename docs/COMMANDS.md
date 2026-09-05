@@ -1,6 +1,6 @@
 # Execution and reproduction commands
 
-All project commands run in `/Users/hassanmezher/Desktop/Projects/inchoufPos`. Source files were authored using shell heredocs/Python text edits, then formatted with oxfmt. Secrets never belong in command logs.
+All project commands run in `/Users/hassanmezher/Desktop/Projects/inchoufPos`. Secrets never belong in command logs.
 
 ## Environment / original domain inspection
 
@@ -18,7 +18,7 @@ All project commands run in `/Users/hassanmezher/Desktop/Projects/inchoufPos`. S
 
 ## Scaffold / packages
 
-- `npm create --yes @openai/sites@0.3.0 . -- --yes --add-ons shadcn,d1,r2 --install`
+- Existing Sites project configuration is retained with the R2 add-on; no D1 add-on is required.
 - `npm install zod`
 - `npm install -D tsx @playwright/test`
 - Patched versions were set in `package.json`, then `npm install` resolved them together. Initial isolated updates hit peer conflicts and were not forced.
@@ -32,10 +32,10 @@ All project commands run in `/Users/hassanmezher/Desktop/Projects/inchoufPos`. S
 
 - `npm run db:generate`
 - `npx drizzle-kit generate --custom --name=tenant_invariants`
-- `node scripts/migrate.mjs`
+- `SUPABASE_DATABASE_URL='postgresql://...' node scripts/migrate.mjs`
 - `node scripts/setup-demo.mjs`
 - `node scripts/seed.mjs`
-- `WRANGLER_SEND_METRICS=false npx wrangler d1 execute DB --local --config wrangler.local.json --command 'DELETE FROM limits'` (local internal-test rate buckets only, before repeated browser tests)
+- `SUPABASE_DATABASE_URL='postgresql://...' npm run db:migrate` (repeatable; applied files are recorded in `drizzle.schema_migrations`)
 
 ## Development / verification
 

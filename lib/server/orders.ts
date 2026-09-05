@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { checkoutInput, updateOrderInput } from './validation';
-import { event, now, uid, stmt, one, rows, type Runtime } from './db';
+import { event, now, uid, stmt, one, rows, type Runtime, database } from './db';
 import { fail, token, hash, requireRole } from './security';
 import {
   transitions,
@@ -20,8 +20,9 @@ export async function placeOrder(
   input: z.infer<typeof checkoutInput>,
   actor = 'Customer',
 ) {
+  const db = database(env);
   const existing = await one<{ id: string }>(
-    env.DB,
+    db,
     'SELECT id FROM orders WHERE tenantId=? AND idempotency=?',
     t.id,
     input.idempotency,
@@ -32,7 +33,7 @@ export async function placeOrder(
       'This order was already submitted. Use the tracking link saved after checkout.',
     );
   const zone = await one<Zone>(
-    env.DB,
+    db,
     'SELECT * FROM zones WHERE tenantId=? AND id=? AND active=1',
     t.id,
     input.zoneId,
@@ -44,7 +45,7 @@ export async function placeOrder(
   let subtotal = 0;
   for (const item of input.items) {
     const p = await one<Product>(
-      env.DB,
+      db,
       'SELECT * FROM products WHERE tenantId=? AND id=? AND active=1',
       t.id,
       item.productId,
@@ -82,9 +83,9 @@ export async function placeOrder(
     tracking = token(),
     date = now(),
     reference = `OP-${Date.now().toString(36).toUpperCase()}-${id.slice(0, 4).toUpperCase()}`;
-  await env.DB.batch([
+  await db.batch([
     stmt(
-      env.DB,
+      db,
       'INSERT INTO orders (id,tenantId,reference,customer,phone,email,address,zoneId,paymentMethod,subtotal,deliveryFee,total,notes,trackingHash,idempotency,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
       id,
       t.id,
@@ -106,7 +107,7 @@ export async function placeOrder(
     ),
     ...lines.map((i) =>
       stmt(
-        env.DB,
+        db,
         'INSERT INTO items (id,tenantId,orderId,productId,name,quantity,price,variant,custom) VALUES (?,?,?,?,?,?,?,?,?)',
         uid(),
         t.id,
@@ -119,7 +120,7 @@ export async function placeOrder(
         JSON.stringify(i.custom),
       ),
     ),
-    event(env.DB, t.id, actor, 'New', id, 'Order received', true),
+    event(db, t.id, actor, 'New', id, 'Order received', true),
   ]);
   return {
     id,
@@ -134,8 +135,9 @@ export async function orderDetail(
   id: string,
   user?: User,
 ) {
+  const db = database(env);
   const order = await one<Order>(
-    env.DB,
+    db,
     'SELECT * FROM orders WHERE tenantId=? AND id=?',
     tenantId,
     id,
@@ -152,19 +154,19 @@ export async function orderDetail(
   return {
     order,
     items: await rows(
-      env.DB,
+      db,
       'SELECT * FROM items WHERE tenantId=? AND orderId=?',
       tenantId,
       id,
     ),
     events: await rows(
-      env.DB,
+      db,
       'SELECT * FROM events WHERE tenantId=? AND orderId=? ORDER BY createdAt DESC',
       tenantId,
       id,
     ),
     proofs: await rows(
-      env.DB,
+      db,
       'SELECT p.*, f.type AS contentType FROM proofs p JOIN files f ON f.id=p.fileId AND f.tenantId=p.tenantId WHERE p.tenantId=? AND p.orderId=? ORDER BY p.version DESC',
       tenantId,
       id,
@@ -177,6 +179,7 @@ export async function updateOrder(
   id: string,
   input: z.infer<typeof updateOrderInput>,
 ) {
+  const db = database(env);
   const t = user.tenantId!;
   const { order: o } = await orderDetail(env, t, id, user);
   const order = o!;
@@ -244,7 +247,7 @@ export async function updateOrder(
   ] as const) {
     if (idValue) {
       const member = await one<User>(
-        env.DB,
+        db,
         'SELECT id,role FROM users WHERE tenantId=? AND id=? AND active=1',
         t,
         idValue,
@@ -264,9 +267,9 @@ export async function updateOrder(
     if (input.cashCollected > order.total)
       fail(400, 'Cash collected cannot exceed the order total.');
   }
-  const result = await env.DB.batch([
+  const result = await db.batch([
     stmt(
-      env.DB,
+      db,
       'UPDATE orders SET status=?,payment=?,employeeId=?,driverId=?,deliveryStatus=?,cashCollected=?,reason=?,version=version+1,updatedAt=? WHERE tenantId=? AND id=? AND version=?',
       status,
       input.payment ?? order.payment,
@@ -280,17 +283,14 @@ export async function updateOrder(
       id,
       input.version,
     ),
-    stmt(
-      env.DB,
-      'INSERT INTO events (id,tenantId,orderId,actor,action,detail,public,createdAt) SELECT ?,?,?,?,?,?,?,? WHERE changes()=1',
-      uid(),
+    event(
+      db,
       t,
-      id,
       user.name,
       status !== order.status ? status : 'Order updated',
+      id,
       input.note || input.reason || 'Order details updated',
-      Number(status !== order.status),
-      now(),
+      status !== order.status,
     ),
   ]);
   if (!result[0].meta.changes)

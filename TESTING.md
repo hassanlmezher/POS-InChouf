@@ -14,9 +14,9 @@ npm run build
 npm audit
 ```
 
-`npm test` exercises the production request handler against an in-memory SQLite database with every migration and trigger applied. Fixtures create a second tenant only inside the disposable test database. No real business is provisioned by tests.
+`npm test` exercises the production request handler against disposable PGlite PostgreSQL with every migration and trigger applied. Fixtures create a second tenant only inside the disposable test database. No real business is provisioned by tests.
 
-Coverage includes cross-tenant product/order access, foreign line/assignment constraints, server pricing, stock rollback, duplicate checkout, state transitions, optimistic concurrency, exactly-once stock restoration, role permissions, suspended businesses, expired sessions, CSRF, login throttling, private tracking redaction/revocation, proof scope/locks, password hashing and CSV injection defenses.
+Coverage includes cross-tenant product/order access, PostgreSQL composite foreign keys, server pricing, stock rollback, duplicate checkout, state transitions, optimistic concurrency, exactly-once stock restoration, Supabase Auth adapter behavior, suspended businesses, expired sessions, CSRF, private tracking, proof scope/locks and CSV injection defenses. The test harness uses an in-memory Auth adapter because tests never contact a real Supabase project.
 
 Chrome end-to-end tests use the safe local internal demo. They cover customer checkout, order appearance in POS, tracking updates, catalog creation, role-specific menus, admin controls, mobile overflow, mobile checkout, reduced-motion fallback, proof approval, picker/packer actions and driver delivery. They intentionally create clearly labelled internal test orders/products. Do not point these tests at real merchant data. Passwords come from ignored `.demo-credentials.json` and are never committed.
 

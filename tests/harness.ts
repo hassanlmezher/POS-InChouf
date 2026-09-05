@@ -1,58 +1,145 @@
-import { DatabaseSync } from 'node:sqlite';
 import { readFileSync, readdirSync } from 'node:fs';
+import { PGlite } from '@electric-sql/pglite';
 import { handle } from '../lib/server/handler';
-import type { Runtime } from '../lib/server/db';
-export function harness() {
-  const sqlite = new DatabaseSync(':memory:');
-  sqlite.exec('PRAGMA foreign_keys=ON');
+import type { Database, Runtime } from '../lib/server/db';
+import type { AuthAdapter, AuthUser } from '../lib/server/supabase';
+
+function bindParams(sql: string) {
+  let i = 0;
+  return sql.replace(/\?/g, () => `$${++i}`);
+}
+
+const keyMap: Record<string, string> = {
+  tenantid: 'tenantId',
+  orderid: 'orderId',
+  productid: 'productId',
+  userid: 'userId',
+  zoneid: 'zoneId',
+  employeeid: 'employeeId',
+  driverid: 'driverId',
+  fileid: 'fileId',
+  lowstock: 'lowStock',
+  customfields: 'customFields',
+  freeabove: 'freeAbove',
+  paymentmethod: 'paymentMethod',
+  deliveryfee: 'deliveryFee',
+  deliverystatus: 'deliveryStatus',
+  cashcollected: 'cashCollected',
+  trackinghash: 'trackingHash',
+  trialstart: 'trialStart',
+  trialend: 'trialEnd',
+  renewaldate: 'renewalDate',
+  suspendeddate: 'suspendedDate',
+  createdat: 'createdAt',
+  updatedat: 'updatedAt',
+};
+
+function normalize<T>(rows: Record<string, unknown>[]) {
+  return rows.map((row) => {
+    const out: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(row))
+      out[keyMap[key.toLowerCase()] || key] = value;
+    return out as T;
+  });
+}
+
+function createAuth(): AuthAdapter {
+  const users = new Map<string, AuthUser & { password: string }>();
+  return {
+    signIn: async (email, password) => {
+      const user = Array.from(users.values()).find((u) => u.email === email);
+      return user?.password === password
+        ? { id: user.id, email: user.email }
+        : null;
+    },
+    createUser: async (input) => {
+      const exists = Array.from(users.values()).some(
+        (u) => u.email === input.email,
+      );
+      if (exists) throw new Error('User already registered');
+      const user = {
+        id: crypto.randomUUID(),
+        email: input.email,
+        password: input.password,
+      };
+      users.set(user.id, user);
+      return { id: user.id, email: user.email };
+    },
+    updatePassword: async (userId, password) => {
+      const user = users.get(userId);
+      if (!user) throw new Error('User not found');
+      user.password = password;
+    },
+    deleteUser: async (userId) => {
+      users.delete(userId);
+    },
+  };
+}
+
+export async function harness() {
+  const pg = new PGlite();
+  await pg.exec(`
+    CREATE ROLE anon;
+    CREATE ROLE authenticated;
+    CREATE ROLE service_role;
+    CREATE SCHEMA auth;
+    CREATE FUNCTION auth.uid() RETURNS uuid AS $$
+    BEGIN
+      RETURN NULLIF(current_setting('request.jwt.claim.sub', true), '')::uuid;
+    END;
+    $$ LANGUAGE plpgsql STABLE;
+  `);
   for (const f of readdirSync('drizzle')
     .filter((f) => f.endsWith('.sql'))
-    .sort())
-    sqlite.exec(readFileSync(`drizzle/${f}`, 'utf8'));
-  class Prepared {
-    constructor(
-      public sql: string,
-      public args: unknown[] = [],
-    ) {}
-    bind(...args: unknown[]) {
-      return new Prepared(this.sql, args);
-    }
-    async first() {
-      return sqlite.prepare(this.sql).get(...(this.args as never[])) || null;
-    }
-    async all() {
-      return {
-        results: sqlite.prepare(this.sql).all(...(this.args as never[])),
-        success: true,
-        meta: { changes: 0 },
-      };
-    }
-    async run() {
-      const r = sqlite.prepare(this.sql).run(...(this.args as never[]));
-      return {
-        results: [],
-        success: true,
-        meta: { changes: Number(r.changes) },
-      };
-    }
+    .sort()) {
+    const statements = readFileSync(`drizzle/${f}`, 'utf8')
+      .split('--> statement-breakpoint')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    for (const statement of statements) await pg.exec(statement);
   }
+  const db: Database = {
+    execute: async <T>(sql: string, args: unknown[] = []) => {
+      const result = await pg.query<T>(bindParams(sql), args as never[]);
+      return {
+        rows: normalize<T>(result.rows as Record<string, unknown>[]),
+        rowCount:
+          typeof result.affectedRows === 'number'
+            ? result.affectedRows
+            : result.rows.length,
+      };
+    },
+    batch: async (statements) => {
+      await pg.exec('BEGIN');
+      try {
+        const results = [];
+        for (const statement of statements) {
+          const result = await pg.query(
+            bindParams(statement.sql),
+            statement.args as never[],
+          );
+          results.push({
+            results: normalize(result.rows as Record<string, unknown>[]),
+            success: true as const,
+            meta: {
+              changes:
+                typeof result.affectedRows === 'number'
+                  ? result.affectedRows
+                  : result.rows.length,
+            },
+          });
+        }
+        await pg.exec('COMMIT');
+        return results;
+      } catch (e) {
+        await pg.exec('ROLLBACK');
+        throw e;
+      }
+    },
+  };
   const blobs = new Map<string, Uint8Array>();
   const env = {
-    DB: {
-      prepare: (s: string) => new Prepared(s),
-      batch: async (statements: Prepared[]) => {
-        sqlite.exec('BEGIN');
-        try {
-          const results = [];
-          for (const s of statements) results.push(await s.run());
-          sqlite.exec('COMMIT');
-          return results;
-        } catch (e) {
-          sqlite.exec('ROLLBACK');
-          throw e;
-        }
-      },
-    },
+    databaseOverride: db,
     FILES: {
       put: async (key: string, data: Uint8Array) => {
         blobs.set(key, data);
@@ -63,9 +150,22 @@ export function harness() {
         blobs.delete(key);
       },
     },
+    AUTH: createAuth(),
     BOOTSTRAP_TOKEN: 'test-only-bootstrap-token',
     SITE_HOST: 'test.invalid',
+    SUPABASE_URL: 'http://supabase.test',
+    SUPABASE_ANON_KEY: 'test-anon-key',
+    SUPABASE_SERVICE_ROLE_KEY: 'test-service-role-key',
   } as unknown as Runtime;
+  async function get<T>(sql: string, ...args: unknown[]) {
+    return (await db.execute<T>(sql, args)).rows[0] || null;
+  }
+  async function all<T>(sql: string, ...args: unknown[]) {
+    return (await db.execute<T>(sql, args)).rows;
+  }
+  async function run(sql: string, ...args: unknown[]) {
+    return db.execute(sql, args);
+  }
   async function request(
     path: string,
     method: string = 'GET',
@@ -83,10 +183,12 @@ export function harness() {
           Cookie: cookie,
           'CF-Connecting-IP': '127.0.0.1',
         },
-        ...(method !== 'GET' && data !== undefined ? {body:JSON.stringify(data)} : {}),
+        ...(method !== 'GET' && data !== undefined
+          ? { body: JSON.stringify(data) }
+          : {}),
       }),
       env,
     );
   }
-  return { sqlite, env, request, blobs };
+  return { db, env, request, blobs, get, all, run };
 }

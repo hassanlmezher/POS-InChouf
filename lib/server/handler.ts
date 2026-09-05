@@ -12,6 +12,7 @@ import {
 } from './validation';
 import {
   type Runtime,
+  database,
   one,
   rows,
   stmt,
@@ -26,8 +27,6 @@ import {
 import {
   HttpError,
   fail,
-  passwordHash,
-  passwordMatches,
   hash,
   token,
   allow,
@@ -35,14 +34,10 @@ import {
   originGuard,
   validHost,
 } from './security';
+import { auth } from './supabase';
 import { placeOrder, orderDetail, updateOrder } from './orders';
 import { seedDemo } from './seed';
-import {
-  type Tenant,
-  type User,
-  type Order,
-  defaultSettings,
-} from '../types';
+import { type Tenant, type User, type Order, defaultSettings } from '../types';
 const json = (
   data: unknown,
   status = 200,
@@ -119,7 +114,7 @@ export async function handle(req: Request, env: Runtime): Promise<Response> {
     );
     try {
       await platformEvent(
-        env.DB,
+        database(env),
         'System',
         'Request error',
         `${req.method} ${new URL(req.url).pathname.split('/').slice(0, 3).join('/')} · ${e instanceof Error ? e.name : 'Error'}`,
@@ -129,7 +124,7 @@ export async function handle(req: Request, env: Runtime): Promise<Response> {
   }
 }
 async function route(req: Request, env: Runtime): Promise<Response> {
-  const db = env.DB;
+  const db = database(env);
   const url = new URL(req.url);
   const p = url.pathname.split('/').filter(Boolean).slice(1);
   const method = req.method;
@@ -160,13 +155,14 @@ async function route(req: Request, env: Runtime): Promise<Response> {
   if (p[0] === 'login' && method === 'POST') {
     await rateLimit(req, db, 'login', 10);
     const input = await body(req, loginInput);
-    const user = await one<User & { password: string }>(
+    const signedIn = await auth(env).signIn(input.email, input.password);
+    if (!signedIn) fail(401, 'Email or password is incorrect.');
+    const user = await one<User>(
       db,
-      'SELECT * FROM users WHERE email=? AND active=1',
-      input.email,
+      'SELECT id,tenantId,email,name,role,active FROM users WHERE id=? AND active=1',
+      signedIn!.id,
     );
-    if (!user || !(await passwordMatches(input.password, user.password)))
-      fail(401, 'Email or password is incorrect.');
+    if (!user) fail(401, 'Email or password is incorrect.');
     if (user!.tenantId) {
       const t = await one<Tenant>(
         db,
@@ -304,17 +300,14 @@ async function route(req: Request, env: Runtime): Promise<Response> {
             p[5],
             'Pending',
           ),
-          stmt(
+          event(
             db,
-            'INSERT INTO events (id,tenantId,orderId,actor,action,detail,public,createdAt) SELECT ?,?,?,?,?,?,?,? WHERE changes()=1',
-            uid(),
             tenant.id,
-            o.id,
             'Customer',
             `Proof ${input.decision.toLowerCase()}`,
+            o.id,
             '',
-            1,
-            now(),
+            true,
           ),
         ]);
         if (!result[0].meta.changes) fail(409, 'This proof already changed.');
@@ -352,22 +345,11 @@ async function route(req: Request, env: Runtime): Promise<Response> {
         })
         .strict(),
     );
-    const stored = await one<{ password: string }>(
-      db,
-      'SELECT password FROM users WHERE id=?',
-      user.id,
-    );
-    if (!(await passwordMatches(input.current, stored!.password)))
+    const signedIn = await auth(env).signIn(user.email, input.current);
+    if (!signedIn || signedIn.id !== user.id)
       fail(400, 'Current password is incorrect.');
-    await db.batch([
-      stmt(
-        db,
-        'UPDATE users SET password=? WHERE id=?',
-        await passwordHash(input.password),
-        user.id,
-      ),
-      stmt(db, 'DELETE FROM sessions WHERE userId=?', user.id),
-    ]);
+    await auth(env).updatePassword(user.id, input.password);
+    await db.batch([stmt(db, 'DELETE FROM sessions WHERE userId=?', user.id)]);
     return json({ ok: true }, 200, { 'Set-Cookie': cookie(req, '', 0) });
   }
   if (p[0] === 'admin') {
@@ -386,31 +368,48 @@ async function route(req: Request, env: Runtime): Promise<Response> {
     if (p[1] === 'tenants' && p.length === 2 && method === 'POST') {
       const input = await body(req, tenantInput);
       const id = uid();
-      await db.batch([
-        stmt(
-          db,
-          'INSERT INTO tenants (id,name,slug,trialStart,trialEnd,settings,createdAt) VALUES (?,?,?,?,?,?,?)',
-          id,
-          input.name,
-          input.slug,
-          now(),
-          new Date(Date.now() + 14 * 86400000).toISOString(),
-          JSON.stringify(defaultSettings),
-          now(),
-        ),
-        stmt(
-          db,
-          'INSERT INTO users (id,tenantId,email,name,role,password,createdAt) VALUES (?,?,?,?,?,?,?)',
-          uid(),
-          id,
-          input.email,
-          input.ownerName,
-          'owner',
-          await passwordHash(input.password),
-          now(),
-        ),
-        platformEvent(db, user.name, 'Business created', input.slug),
-      ]);
+      if (await one(db, 'SELECT id FROM tenants WHERE slug=?', input.slug))
+        fail(409, 'That email, SKU, slug or request already exists.');
+      if (await one(db, 'SELECT id FROM users WHERE email=?', input.email))
+        fail(409, 'That email, SKU, slug or request already exists.');
+      const owner = await auth(env).createUser({
+        email: input.email,
+        password: input.password,
+        name: input.ownerName,
+        role: 'owner',
+        tenantId: id,
+      });
+      try {
+        await db.batch([
+          stmt(
+            db,
+            'INSERT INTO tenants (id,name,slug,trialStart,trialEnd,settings,createdAt) VALUES (?,?,?,?,?,?,?)',
+            id,
+            input.name,
+            input.slug,
+            now(),
+            new Date(Date.now() + 14 * 86400000).toISOString(),
+            JSON.stringify(defaultSettings),
+            now(),
+          ),
+          stmt(
+            db,
+            'INSERT INTO users (id,tenantId,email,name,role,createdAt) VALUES (?,?,?,?,?,?)',
+            owner.id,
+            id,
+            input.email,
+            input.ownerName,
+            'owner',
+            now(),
+          ),
+          platformEvent(db, user.name, 'Business created', input.slug),
+        ]);
+      } catch (e) {
+        await auth(env)
+          .deleteUser(owner.id)
+          .catch(() => {});
+        throw e;
+      }
       return json({ id }, 201);
     }
     if (p[1] === 'tenants' && p[2] && method === 'PATCH') {
@@ -471,13 +470,8 @@ async function route(req: Request, env: Runtime): Promise<Response> {
         'owner',
       );
       if (!owner) fail(404, 'Owner not found.');
+      await auth(env).updatePassword(owner!.id, input.password);
       await db.batch([
-        stmt(
-          db,
-          'UPDATE users SET password=? WHERE id=?',
-          await passwordHash(input.password),
-          owner!.id,
-        ),
         stmt(db, 'DELETE FROM sessions WHERE userId=?', owner!.id),
         platformEvent(db, user.name, 'Owner access reset', p[2]),
       ]);
@@ -588,9 +582,7 @@ async function route(req: Request, env: Runtime): Promise<Response> {
         fail(409, 'This order is already past proof preparation.');
       const input = await body(
         req,
-        z
-          .object({ fileId: z.uuid(), note: z.string().max(2000) })
-          .strict(),
+        z.object({ fileId: z.uuid(), note: z.string().max(2000) }).strict(),
       );
       await db.batch([
         stmt(
@@ -630,7 +622,16 @@ async function route(req: Request, env: Runtime): Promise<Response> {
       );
     if (['POST', 'PATCH'].includes(method)) {
       const input = await body(req, productInput);
-      if(input.image.startsWith('/api/images/')&&!await one(db,'SELECT id FROM files WHERE id=? AND tenantId=? AND orderId IS NULL',input.image.split('/').pop(),t))fail(400,'Choose an image uploaded by your business.');
+      if (
+        input.image.startsWith('/api/images/') &&
+        !(await one(
+          db,
+          'SELECT id FROM files WHERE id=? AND tenantId=? AND orderId IS NULL',
+          input.image.split('/').pop(),
+          t,
+        ))
+      )
+        fail(400, 'Choose an image uploaded by your business.');
       if (
         method === 'PATCH' &&
         !(await one(
@@ -760,22 +761,36 @@ async function route(req: Request, env: Runtime): Promise<Response> {
     allow(user, 'team');
     if (method === 'POST') {
       const i = await body(req, staffInput);
-      const id = uid();
-      await db.batch([
-        stmt(
-          db,
-          'INSERT INTO users (id,tenantId,email,name,role,password,createdAt) VALUES (?,?,?,?,?,?,?)',
-          id,
-          t,
-          i.email,
-          i.name,
-          i.role,
-          await passwordHash(i.password),
-          now(),
-        ),
-        event(db, t, user.name, 'Employee created', null, i.name),
-      ]);
-      return json({ id }, 201);
+      if (await one(db, 'SELECT id FROM users WHERE email=?', i.email))
+        fail(409, 'That email, SKU, slug or request already exists.');
+      const created = await auth(env).createUser({
+        email: i.email,
+        password: i.password,
+        name: i.name,
+        role: i.role,
+        tenantId: t,
+      });
+      try {
+        await db.batch([
+          stmt(
+            db,
+            'INSERT INTO users (id,tenantId,email,name,role,createdAt) VALUES (?,?,?,?,?,?)',
+            created.id,
+            t,
+            i.email,
+            i.name,
+            i.role,
+            now(),
+          ),
+          event(db, t, user.name, 'Employee created', null, i.name),
+        ]);
+      } catch (e) {
+        await auth(env)
+          .deleteUser(created.id)
+          .catch(() => {});
+        throw e;
+      }
+      return json({ id: created.id }, 201);
     }
     if (method === 'PATCH' && p[1]) {
       const i = await body(
@@ -946,13 +961,14 @@ async function upload(
   const name = (req.headers.get('x-file-name') || 'upload')
     .replace(/[^a-zA-Z0-9._ -]/g, '_')
     .slice(0, 120);
+  const db = database(env);
   await env.FILES.put(`${tenantId}/${id}`, data, {
     httpMetadata: { contentType: type },
   });
   try {
-    await env.DB.batch([
+    await db.batch([
       stmt(
-        env.DB,
+        db,
         'INSERT INTO files (id,tenantId,orderId,name,type,size,createdAt) VALUES (?,?,?,?,?,?,?)',
         id,
         tenantId,
@@ -962,7 +978,7 @@ async function upload(
         size,
         now(),
       ),
-      event(env.DB, tenantId, actor, 'File uploaded', orderId, name),
+      event(db, tenantId, actor, 'File uploaded', orderId, name),
     ]);
   } catch (e) {
     await env.FILES.delete(`${tenantId}/${id}`);
@@ -978,7 +994,7 @@ async function download(
   publicImage = false,
 ) {
   const f = await one<{ name: string; type: string; orderId: string | null }>(
-    env.DB,
+    database(env),
     'SELECT name,type,orderId FROM files WHERE tenantId=? AND id=?',
     tenantId,
     id,

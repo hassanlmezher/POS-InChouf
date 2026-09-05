@@ -12,13 +12,14 @@ Requirements: Node.js 22.13+, npm, and Chrome for browser tests.
 cd /Users/hassanmezher/Desktop/Projects/inchoufPos
 npm ci
 npm run demo:setup
+# Put Supabase values from .env.example into .dev.vars first.
 npm run db:migrate
 npm run dev
-# Once the server is running, in a second terminal:
+# In a second terminal, bootstrap the empty Supabase database:
 npm run db:seed
 ```
 
-The existing local installation has already been migrated and seeded. Start it with `npm run dev`; do not seed it again. Bootstrap refuses a nonempty users table.
+`npm run db:migrate` is repeatable and records applied files in `drizzle.schema_migrations`. `npm run db:seed` creates Supabase Auth users and the demo tenant once; bootstrap refuses a nonempty users table.
 
 - Marketing: http://localhost:3000/
 - POS: http://localhost:3000/pos
@@ -44,8 +45,8 @@ Demo account emails: `admin@demo.inchouf.test`, `owner@demo.inchouf.test`, `pick
 
 ## Configuration and docs
 
-Set public platform contacts in `config/contact.ts`. The environment example documents private bootstrap configuration; Sites manages hosted DB and FILES bindings. No Meta, WhatsApp, SMS, gateway, courier, marketplace or AI service is required.
+Set public platform contacts in `config/contact.ts`. Supabase provides PostgreSQL and Auth. The Worker keeps the existing private Cloudflare R2 `FILES` binding for uploads because it avoids a second file API and keeps signed access in one server boundary. No Meta, WhatsApp, SMS, gateway, courier, marketplace or AI service is required.
 
 See `ARCHITECTURE.md`, `DEPLOYMENT.md`, `TESTING.md`, `docs/API.md`, `docs/PRODUCTION-CHECKLIST.md`, `docs/COMMANDS.md` and `docs/STATUS.md` for verified capabilities, commands, deployment state and remaining operational work.
 
-The application uses the Next.js App Router API on Vinext/Cloudflare with D1 (SQLite), not a configured PostgreSQL/Vercel backend. The current Vercel website was preserved. Production domains must not be described as live until DNS, certificates, access policy and actual URLs are verified.
+The application uses the Next.js App Router API on Vinext/Cloudflare Workers with Supabase PostgreSQL/Auth and private R2. The current Vercel website was preserved. Production domains must not be described as live until DNS, certificates, access policy and actual URLs are verified.

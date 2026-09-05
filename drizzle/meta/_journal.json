@@ -1,19 +1,19 @@
 {
   "version": "7",
-  "dialect": "sqlite",
+  "dialect": "postgresql",
   "entries": [
     {
       "idx": 0,
-      "version": "6",
-      "when": 1788614200093,
-      "tag": "0000_clever_lord_hawal",
+      "version": "7",
+      "when": 1788636855771,
+      "tag": "0000_initial_supabase_postgres",
       "breakpoints": true
     },
     {
       "idx": 1,
-      "version": "6",
-      "when": 1788614380374,
-      "tag": "0001_tenant_invariants",
+      "version": "7",
+      "when": 1788639233670,
+      "tag": "0001_bigint_expiry_check",
       "breakpoints": true
     }
   ]

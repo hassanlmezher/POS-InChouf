@@ -1,5 +1,5 @@
 import { Buffer } from 'node:buffer';
-import { scrypt, timingSafeEqual, randomBytes, createHash } from 'node:crypto';
+import { randomBytes, createHash } from 'node:crypto';
 import type { Role, Permission, User } from '../types';
 import { rolePermissions } from '../types';
 export class HttpError extends Error {
@@ -16,27 +16,6 @@ export const fail = (status: number, message: string): never => {
 export const token = () => Buffer.from(randomBytes(32)).toString('hex');
 export const hash = (value: string) =>
   createHash('sha256').update(value).digest('hex');
-const derive = (password: string, salt: string) =>
-  new Promise<Uint8Array>((resolve, reject) =>
-    scrypt(
-      password,
-      salt,
-      32,
-      { N: 32768, r: 8, p: 3, maxmem: 64 * 1024 * 1024 },
-      (e, k) => (e ? reject(e) : resolve(Buffer.from(k))),
-    ),
-  );
-export async function passwordHash(password: string) {
-  const salt = token();
-  return `scrypt$${salt}$${Array.from(await derive(password, salt), b=>b.toString(16).padStart(2,'0')).join('')}`;
-}
-export async function passwordMatches(password: string, stored: string) {
-  const [, salt, value] = stored.split('$');
-  if (!salt || !value) return false;
-  const actual = await derive(password, salt);
-  const expected = Buffer.from(value, 'hex');
-  return expected.length === actual.length && timingSafeEqual(actual, expected);
-}
 export function allow(user: User, permission: Permission) {
   if (!rolePermissions[user.role]?.includes(permission))
     fail(403, 'You do not have permission for this action.');

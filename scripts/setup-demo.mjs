@@ -13,9 +13,9 @@ if (!existsSync(credsPath)) {
 if (!existsSync('.dev.vars'))
   writeFileSync(
     '.dev.vars',
-    `BOOTSTRAP_TOKEN=${randomBytes(32).toString('hex')}\nSITE_HOST=inchouf-orderpilot.copper-goat-7392.chatgpt.site\n`,
+    `# Add SUPABASE_URL, SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY from the project dashboard.\n# SUPABASE_DATABASE_URL is needed only by npm run db:migrate.\nBOOTSTRAP_TOKEN=${randomBytes(32).toString('hex')}\nSITE_HOST=localhost\n`,
     { mode: 0o600 },
   );
 console.log(
-  'Private demo credentials and bootstrap configuration are ready. Restart the dev server, then run npm run db:seed.',
+  'Private demo credentials and bootstrap configuration are ready. Add the Supabase values to .dev.vars, restart the dev server, then run npm run db:migrate and npm run db:seed.',
 );
