@@ -22,7 +22,18 @@ Configure these Worker variables/secrets exactly:
 - `SITE_HOST`: deployed Sites hostname, or the configured canonical application hostname.
 - `BOOTSTRAP_TOKEN`: one-time random encrypted secret, removed after bootstrap.
 
-Keep the existing R2 bucket binding `FILES`. The Sites configuration must retain the logical R2 binding and must not include `d1` or `d1_databases`. `SUPABASE_DATABASE_URL` is for local/CI migration commands only and is not required in the Worker. Build with `npm run build`; deploy using the existing Sites workflow for this project.
+Keep the existing R2 bucket binding `FILES` → `site-creator-r2`. The configuration must not include `d1` or `d1_databases`. `SUPABASE_DATABASE_URL` is for local/CI migration commands only and is not required in the Worker.
+
+### Cloudflare CI build commands
+
+Set exactly these in the Cloudflare dashboard (Workers & Pages → Settings → Build):
+
+| Setting | Value |
+|---|---|
+| Build command | `npm run build` |
+| Deploy command | `npx @vinext/cloudflare deploy` |
+
+`wrangler.json` is committed to the repository root and must remain tracked. `@vinext/cloudflare deploy` detects it via `hasWranglerConfig()` — if the file is missing from git, the deploy step will fail with "Missing Cloudflare deployment setup: Wrangler config". Do not add `wrangler.json` to `.gitignore`.
 
 ## DNS and verification
 
