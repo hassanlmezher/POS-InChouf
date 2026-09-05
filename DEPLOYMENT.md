@@ -24,13 +24,15 @@ Configure these Worker variables/secrets exactly:
 
 Keep the existing R2 bucket binding `FILES` → `site-creator-r2`. The configuration must not include `d1` or `d1_databases`. `SUPABASE_DATABASE_URL` is for local/CI migration commands only and is not required in the Worker.
 
+The exact temporary Worker hostname `pos-inchouf.hassanmezher084.workers.dev` is explicitly allowlisted for testing. Other workers.dev hostnames remain rejected. `SITE_HOST=inchouf.com` continues to govern the production custom-domain architecture.
+
 ### Cloudflare CI build commands
 
 Set exactly these in the Cloudflare dashboard (Workers & Pages → Settings → Build):
 
-| Setting | Value |
-|---|---|
-| Build command | `npm run build` |
+| Setting        | Value                           |
+| -------------- | ------------------------------- |
+| Build command  | `npm run build`                 |
 | Deploy command | `npx @vinext/cloudflare deploy` |
 
 `wrangler.json` is committed to the repository root and must remain tracked. `@vinext/cloudflare deploy` detects it via `hasWranglerConfig()` — if the file is missing from git, the deploy step will fail with "Missing Cloudflare deployment setup: Wrangler config". Do not add `wrangler.json` to `.gitignore`.

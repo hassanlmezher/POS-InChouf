@@ -2,7 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { harness } from './harness';
 import { seedDemo } from '../lib/server/seed';
-import { hash, token, hostTenant } from '../lib/server/security';
+import {
+  hash,
+  token,
+  hostTenant,
+  validHost,
+  temporaryWorkerHost,
+} from '../lib/server/security';
 import { parseCSV, exportCSV } from '../lib/csv';
 
 const passwords = {
@@ -394,9 +400,40 @@ void test('proof files are tenant-scoped and approved proofs cannot be changed',
 void test('security helpers and CSV export retain their non-database guarantees', () => {
   assert.equal(hostTenant('internal-demo.inchouf.com'), 'internal-demo');
   assert.equal(hostTenant('app.inchouf.com'), null);
+  assert.equal(validHost(temporaryWorkerHost, 'inchouf.com'), true);
+  assert.equal(validHost('untrusted.workers.dev', 'inchouf.com'), false);
+  assert.equal(validHost('business.inchouf.com', 'inchouf.com'), true);
   assert.deepEqual(parseCSV('a,b\n"hello, world","a""b"'), [
     ['a', 'b'],
     ['hello, world', 'a"b'],
   ]);
   assert.match(exportCSV([['=HYPERLINK("bad")']]), /"'=HYPERLINK/);
+});
+
+void test('the exact workers.dev host reaches the Worker while arbitrary hosts do not', async () => {
+  const h = await harness();
+  assert.equal(
+    (
+      await h.request(
+        'health',
+        'GET',
+        undefined,
+        '',
+        `https://${temporaryWorkerHost}`,
+      )
+    ).status,
+    200,
+  );
+  assert.equal(
+    (
+      await h.request(
+        'health',
+        'GET',
+        undefined,
+        '',
+        'https://untrusted.workers.dev',
+      )
+    ).status,
+    400,
+  );
 });

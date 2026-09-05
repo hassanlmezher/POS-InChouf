@@ -34,6 +34,7 @@ export const reserved = [
   'static',
   'assets',
 ];
+export const temporaryWorkerHost = 'pos-inchouf.hassanmezher084.workers.dev';
 export function hostTenant(host: string) {
   const hostname = host.toLowerCase().split(':')[0];
   if (hostname.endsWith('.inchouf.com')) {
@@ -53,7 +54,8 @@ export function validHost(host: string, siteHost?: string) {
     h === '127.0.0.1' ||
     h === 'inchouf.com' ||
     h.endsWith('.inchouf.com') ||
-    h === siteHost
+    h === siteHost ||
+    h === temporaryWorkerHost
   );
 }
 export function assertTenant(user: User, tenantId: string) {
