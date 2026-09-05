@@ -1,0 +1,1 @@
+export default function NotFound(){return <main className="section"><h1>This page isn’t here.</h1><p style={{margin:'20px 0'}}>Check the address or return to InChouf.</p><a className="button" href="/">Back to InChouf</a></main>}

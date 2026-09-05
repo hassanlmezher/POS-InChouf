@@ -1,0 +1,11 @@
+scripts/setup-demo.mjs:2:37: error eslint(no-unused-vars): Identifier 'readFileSync' is imported but never used. help: Consider removing this import.
+app/page.tsx:77:24: error react(jsx-key): Missing "key" prop for element in array.
+app/page.tsx:78:24: error react(jsx-key): Missing "key" prop for element in array.
+app/page.tsx:79:24: error react(jsx-key): Missing "key" prop for element in array.
+app/page.tsx:80:24: error react(jsx-key): Missing "key" prop for element in array.
+app/page.tsx:81:24: error react(jsx-key): Missing "key" prop for element in array.
+app/page.tsx:82:24: error react(jsx-key): Missing "key" prop for element in array.
+tests/harness.ts:86:9: error unicorn(no-invalid-fetch-options): "body" is not allowed when method is "GET"
+lib/client.ts:11:5: error unicorn(no-invalid-fetch-options): "body" is not allowed when method is "GET"
+lib/server/handler.ts:44:8: error eslint(no-unused-vars): Type 'Product' is imported but never used. help: Consider removing this import.
+lib/server/handler.ts:45:3: error eslint(no-unused-vars): Identifier 'settingsOf' is imported but never used. help: Consider removing this import.
