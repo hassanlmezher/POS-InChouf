@@ -9,6 +9,7 @@ import {
   validHost,
   temporaryWorkerHost,
 } from '../lib/server/security';
+import { supabaseJsonHeaders } from '../lib/server/supabase-headers';
 import { parseCSV, exportCSV } from '../lib/csv';
 
 const passwords = {
@@ -61,6 +62,7 @@ async function checkout(h: Awaited<ReturnType<typeof setup>>, quantity = 1) {
 
 void test('production bootstrap creates only the first platform admin', async () => {
   const h = await harness();
+  const adminHost = 'https://admin.inchouf.com';
   const tokenHeader = { 'X-Bootstrap-Token': 'test-only-bootstrap-token' };
   const input = {
     email: 'ADMIN@INCHOUF.COM',
@@ -68,7 +70,10 @@ void test('production bootstrap creates only the first platform admin', async ()
     name: 'InChouf Admin',
   };
 
-  assert.equal((await h.request('bootstrap', 'POST', input)).status, 404);
+  assert.equal(
+    (await h.request('bootstrap', 'POST', input, '', adminHost)).status,
+    404,
+  );
   assert.equal(
     (
       await h.request(
@@ -76,7 +81,7 @@ void test('production bootstrap creates only the first platform admin', async ()
         'POST',
         input,
         '',
-        'http://test.invalid',
+        adminHost,
         'http://evil.test',
         tokenHeader,
       )
@@ -89,8 +94,8 @@ void test('production bootstrap creates only the first platform admin', async ()
     'POST',
     input,
     '',
-    'http://test.invalid',
-    'http://test.invalid',
+    adminHost,
+    adminHost,
     tokenHeader,
   );
   const createdText = await created.text();
@@ -127,15 +132,39 @@ void test('production bootstrap creates only the first platform admin', async ()
       tenantId: null,
     },
   );
-  assert.equal(
-    (
-      await h.request('login', 'POST', {
-        email: 'admin@inchouf.com',
-        password: input.password,
-      })
-    ).status,
-    200,
+  const login = await h.request(
+    'login',
+    'POST',
+    {
+      email: 'admin@inchouf.com',
+      password: input.password,
+    },
+    '',
+    adminHost,
+    adminHost,
   );
+  assert.equal(login.status, 200);
+  const cookie = login.headers.get('set-cookie')!.match(/op_session=([^;]+)/)!;
+  const me = await h.request(
+    'me',
+    'GET',
+    undefined,
+    `op_session=${cookie[1]}`,
+    adminHost,
+    adminHost,
+  );
+  assert.equal(me.status, 200);
+  assert.deepEqual((await me.json()) as unknown, {
+    user: {
+      id: (await h.get<{ id: string }>('SELECT id FROM users LIMIT 1'))!.id,
+      tenantId: null,
+      email: 'admin@inchouf.com',
+      name: 'InChouf Admin',
+      role: 'super_admin',
+      active: 1,
+    },
+    tenant: null,
+  });
   assert.equal(
     (
       await h.request(
@@ -146,12 +175,28 @@ void test('production bootstrap creates only the first platform admin', async ()
           password: 'second-admin-password',
         },
         '',
-        'http://test.invalid',
-        'http://test.invalid',
+        adminHost,
+        adminHost,
         tokenHeader,
       )
     ).status,
     409,
+  );
+});
+
+void test('Supabase API keys are not sent as JWT bearer tokens', () => {
+  const publishable = supabaseJsonHeaders('sb_publishable_example');
+  assert.equal(publishable.get('apikey'), 'sb_publishable_example');
+  assert.equal(publishable.has('authorization'), false);
+
+  const secret = supabaseJsonHeaders('sb_secret_example');
+  assert.equal(secret.get('apikey'), 'sb_secret_example');
+  assert.equal(secret.has('authorization'), false);
+
+  const legacy = supabaseJsonHeaders('eyJhbGciOiJIUzI1NiJ9.example');
+  assert.equal(
+    legacy.get('authorization'),
+    'Bearer eyJhbGciOiJIUzI1NiJ9.example',
   );
 });
 

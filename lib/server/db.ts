@@ -1,5 +1,6 @@
 import type { User, Tenant } from '../types';
 import { fail, hash, hostTenant, assertTenant } from './security';
+import { supabaseJsonHeaders } from './supabase-headers';
 
 export interface QueryResult<T = unknown> {
   rows: T[];
@@ -78,11 +79,7 @@ function normalizeRows<T>(rows: Record<string, unknown>[]): T[] {
 
 function createSupabaseDatabase(env: Runtime): Database {
   const endpoint = `${env.SUPABASE_URL.replace(/\/$/, '')}/rest/v1/rpc`;
-  const headers = {
-    apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-    Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-    'Content-Type': 'application/json',
-  };
+  const headers = supabaseJsonHeaders(env.SUPABASE_SERVICE_ROLE_KEY);
   const rpc = async <T>(name: string, body: unknown): Promise<T> => {
     const response = await fetch(`${endpoint}/${name}`, {
       method: 'POST',

@@ -1,5 +1,6 @@
 import type { Runtime } from './db';
 import { fail } from './security';
+import { supabaseJsonHeaders } from './supabase-headers';
 
 export interface AuthUser {
   id: string;
@@ -37,10 +38,7 @@ async function authFetch<T>(
     throw new Error(
       `${serviceRole ? 'SUPABASE_SERVICE_ROLE_KEY' : 'SUPABASE_ANON_KEY'} is required.`,
     );
-  const headers = new Headers(init.headers);
-  headers.set('apikey', key);
-  headers.set('Authorization', `Bearer ${key}`);
-  headers.set('Content-Type', 'application/json');
+  const headers = supabaseJsonHeaders(key, init.headers);
   const res = await fetch(`${authBase(env)}${path}`, { ...init, headers });
   const text = await res.text();
   const data = text ? JSON.parse(text) : null;
