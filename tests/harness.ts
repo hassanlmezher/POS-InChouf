@@ -173,6 +173,7 @@ export async function harness() {
     cookie = '',
     host = 'http://test.invalid',
     origin = host,
+    extraHeaders: Record<string, string> = {},
   ) {
     return handle(
       new Request(`${host}/api/${path}`, {
@@ -182,6 +183,7 @@ export async function harness() {
           'Content-Type': 'application/json',
           Cookie: cookie,
           'CF-Connecting-IP': '127.0.0.1',
+          ...extraHeaders,
         },
         ...(method !== 'GET' && data !== undefined
           ? { body: JSON.stringify(data) }

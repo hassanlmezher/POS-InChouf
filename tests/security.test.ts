@@ -59,6 +59,102 @@ async function checkout(h: Awaited<ReturnType<typeof setup>>, quantity = 1) {
   };
 }
 
+void test('production bootstrap creates only the first platform admin', async () => {
+  const h = await harness();
+  const tokenHeader = { 'X-Bootstrap-Token': 'test-only-bootstrap-token' };
+  const input = {
+    email: 'ADMIN@INCHOUF.COM',
+    password: 'first-admin-password',
+    name: 'InChouf Admin',
+  };
+
+  assert.equal((await h.request('bootstrap', 'POST', input)).status, 404);
+  assert.equal(
+    (
+      await h.request(
+        'bootstrap',
+        'POST',
+        input,
+        '',
+        'http://test.invalid',
+        'http://evil.test',
+        tokenHeader,
+      )
+    ).status,
+    403,
+  );
+
+  const created = await h.request(
+    'bootstrap',
+    'POST',
+    input,
+    '',
+    'http://test.invalid',
+    'http://test.invalid',
+    tokenHeader,
+  );
+  const createdText = await created.text();
+  assert.equal(created.status, 201, createdText);
+  const response = JSON.parse(createdText) as {
+    ok: boolean;
+    user: { email: string; role: string };
+    password?: string;
+  };
+  assert.deepEqual(response, {
+    ok: true,
+    user: { email: 'admin@inchouf.com', role: 'super_admin' },
+  });
+  assert.equal(response.password, undefined);
+
+  assert.equal(
+    (await h.get<{ count: number }>('SELECT COUNT(*) count FROM users'))!.count,
+    1,
+  );
+  assert.equal(
+    (await h.get<{ count: number }>('SELECT COUNT(*) count FROM tenants'))!
+      .count,
+    0,
+  );
+  assert.deepEqual(
+    await h.get(
+      'SELECT email,name,role,tenantId FROM users WHERE email=?',
+      'admin@inchouf.com',
+    ),
+    {
+      email: 'admin@inchouf.com',
+      name: 'InChouf Admin',
+      role: 'super_admin',
+      tenantId: null,
+    },
+  );
+  assert.equal(
+    (
+      await h.request('login', 'POST', {
+        email: 'admin@inchouf.com',
+        password: input.password,
+      })
+    ).status,
+    200,
+  );
+  assert.equal(
+    (
+      await h.request(
+        'bootstrap',
+        'POST',
+        {
+          email: 'second@inchouf.com',
+          password: 'second-admin-password',
+        },
+        '',
+        'http://test.invalid',
+        'http://test.invalid',
+        tokenHeader,
+      )
+    ).status,
+    409,
+  );
+});
+
 void test('tenant isolation covers catalog, orders, storefronts and settings', async () => {
   const h = await setup();
   const date = new Date().toISOString();

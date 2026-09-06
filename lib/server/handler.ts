@@ -36,7 +36,6 @@ import {
 } from './security';
 import { auth } from './supabase';
 import { placeOrder, orderDetail, updateOrder } from './orders';
-import { seedDemo } from './seed';
 import { type Tenant, type User, type Order, defaultSettings } from '../types';
 const json = (
   data: unknown,
@@ -143,14 +142,55 @@ async function route(req: Request, env: Runtime): Promise<Response> {
       req,
       z
         .object({
-          admin: z.string().min(16),
-          owner: z.string().min(16),
-          picker: z.string().min(16),
-          driver: z.string().min(16),
+          email: z.email().transform((x) => x.toLowerCase()),
+          password: z.string().min(16).max(128),
+          name: z.string().trim().min(2).max(100).default('Platform Admin'),
         })
         .strict(),
     );
-    return json(await seedDemo(env, input), 201);
+    if (
+      await one(
+        db,
+        "SELECT id FROM users WHERE tenantId IS NULL OR role='super_admin' LIMIT 1",
+      )
+    )
+      fail(409, 'Bootstrap has already been completed.');
+    const created = await auth(env).createUser({
+      email: input.email,
+      password: input.password,
+      name: input.name,
+      role: 'super_admin',
+      tenantId: null,
+    });
+    try {
+      await db.batch([
+        stmt(
+          db,
+          'INSERT INTO users (id,tenantId,email,name,role,createdAt) VALUES (?,?,?,?,?,?)',
+          created.id,
+          null,
+          input.email,
+          input.name,
+          'super_admin',
+          now(),
+        ),
+        platformEvent(
+          db,
+          input.name,
+          'Platform bootstrap completed',
+          input.email,
+        ),
+      ]);
+    } catch (e) {
+      await auth(env)
+        .deleteUser(created.id)
+        .catch(() => {});
+      throw e;
+    }
+    return json(
+      { ok: true, user: { email: input.email, role: 'super_admin' } },
+      201,
+    );
   }
   if (p[0] === 'login' && method === 'POST') {
     await rateLimit(req, db, 'login', 10);

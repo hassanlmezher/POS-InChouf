@@ -17,5 +17,5 @@ if (!existsSync('.dev.vars'))
     { mode: 0o600 },
   );
 console.log(
-  'Private demo credentials and bootstrap configuration are ready. Add the Supabase values to .dev.vars, restart the dev server, then run npm run db:migrate and npm run db:seed.',
+  'Private local credentials and bootstrap configuration are ready. Add the Supabase values to .dev.vars, restart the dev server, then run npm run db:migrate and npm run db:seed.',
 );

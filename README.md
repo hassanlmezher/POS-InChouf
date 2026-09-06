@@ -15,11 +15,11 @@ npm run demo:setup
 # Put Supabase values from .env.example into .dev.vars first.
 npm run db:migrate
 npm run dev
-# In a second terminal, bootstrap the empty Supabase database:
+# In a second terminal, bootstrap the first local Super Admin:
 npm run db:seed
 ```
 
-`npm run db:migrate` is repeatable and records applied files in `drizzle.schema_migrations`. `npm run db:seed` creates Supabase Auth users and the demo tenant once; bootstrap refuses a nonempty users table.
+`npm run db:migrate` is repeatable and records applied files in `drizzle.schema_migrations`. `npm run db:seed` creates only the first Supabase Auth-backed Super Admin through the same one-time bootstrap path used in production.
 
 - Marketing: http://localhost:3000/
 - POS: http://localhost:3000/pos
@@ -28,7 +28,7 @@ npm run db:seed
 - Internal demo: http://localhost:3000/store/internal-demo
 - Tracking: private link returned after placing an order
 
-Demo account emails: `admin@demo.inchouf.test`, `owner@demo.inchouf.test`, `picker@demo.inchouf.test`, `driver@demo.inchouf.test`. Random passwords are in `.demo-credentials.json` (mode 0600, Git-ignored). There are no fixed source-code passwords. These accounts and the sole demo tenant are for internal testing only.
+The local bootstrap email defaults to `admin@demo.inchouf.test`, and its random password is in `.demo-credentials.json` (mode 0600, Git-ignored). There are no fixed source-code passwords. Demo tenant and staff fixtures are test-only data and must not be created through production bootstrap.
 
 ## Features
 

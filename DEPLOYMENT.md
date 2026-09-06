@@ -10,7 +10,7 @@ OrderPilot remains a Vinext application deployed as a Cloudflare Worker through 
 4. Run `npm run db:migrate` with `SUPABASE_DATABASE_URL` set, or run the generated SQL in `drizzle/0000_initial_supabase_postgres.sql` in the Supabase SQL Editor.
 5. Confirm the migration created the RLS policies, integrity triggers and private RPC functions `op_query` and `op_batch`.
 
-The service-role key is required only by the Worker server runtime and must never be placed in client-exposed Vite variables. The bootstrap endpoint creates Supabase Auth users and application profiles once; remove `BOOTSTRAP_TOKEN` after provisioning.
+The service-role key is required only by the Worker server runtime and must never be placed in client-exposed Vite variables. The bootstrap endpoint creates the first Supabase Auth-backed `super_admin` profile once; remove `BOOTSTRAP_TOKEN` after provisioning.
 
 ## Cloudflare settings
 
