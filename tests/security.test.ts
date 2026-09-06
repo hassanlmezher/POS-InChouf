@@ -444,6 +444,44 @@ void test('cancellation restores inventory once and preserves order state transi
   );
 });
 
+void test('packed delivery orders can be sent out by the business owner', async () => {
+  const h = await setup();
+  const owner = (await h.get<{ id: string }>(
+    "SELECT id FROM users WHERE role='owner'",
+  ))!;
+  const created = (await (
+    await h.request('store/internal-demo/orders', 'POST', await checkout(h))
+  ).json()) as { id: string };
+  for (const [version, status] of [
+    [0, 'Confirmed'],
+    [1, 'Picking'],
+    [2, 'Packed'],
+  ] as const) {
+    const response = await h.request(
+      `orders/${created.id}`,
+      'PATCH',
+      { version, status },
+      h.cookie,
+    );
+    assert.equal(response.status, 200, await response.text());
+  }
+
+  const response = await h.request(
+    `orders/${created.id}`,
+    'PATCH',
+    { version: 3, status: 'Out for Delivery' },
+    h.cookie,
+  );
+  const responseText = await response.text();
+  assert.equal(response.status, 200, responseText);
+  const detail = JSON.parse(responseText) as {
+    order: { status: string; driverId: string; deliveryStatus: string };
+  };
+  assert.equal(detail.order.status, 'Out for Delivery');
+  assert.equal(detail.order.driverId, owner.id);
+  assert.equal(detail.order.deliveryStatus, 'On the way');
+});
+
 void test('Supabase Auth-backed login creates app sessions and enforces expiry and suspension', async () => {
   const h = await setup();
   const login = await h.request('login', 'POST', {

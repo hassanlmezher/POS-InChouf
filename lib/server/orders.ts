@@ -237,13 +237,25 @@ export async function updateOrder(
     !input.note?.trim()
   )
     fail(400, 'Add a reason for this status change.');
-  if (status === 'Out for Delivery' && !(input.driverId ?? order.driverId))
-    fail(400, 'Assign a driver before sending the order.');
+  let driverId = input.driverId === undefined ? order.driverId : input.driverId;
+  if (status === 'Out for Delivery' && !driverId) {
+    if (user.role !== 'owner' || input.driverId !== undefined)
+      fail(400, 'Assign a driver before sending the order.');
+    driverId = user.id;
+  }
+  const deliveryStatus =
+    input.deliveryStatus ??
+    (status === 'Out for Delivery' && status !== order.status
+      ? 'On the way'
+      : order.deliveryStatus);
   if (input.employeeId !== undefined || input.driverId !== undefined)
     requireRole(user, ['owner', 'order_manager']);
+  const validateDriver =
+    input.driverId !== undefined ||
+    (status === 'Out for Delivery' && !!driverId);
   for (const [key, idValue] of [
     ['employeeId', input.employeeId],
-    ['driverId', input.driverId],
+    ['driverId', validateDriver ? driverId : undefined],
   ] as const) {
     if (idValue) {
       const member = await one<User>(
@@ -274,8 +286,8 @@ export async function updateOrder(
       status,
       input.payment ?? order.payment,
       input.employeeId === undefined ? order.employeeId : input.employeeId,
-      input.driverId === undefined ? order.driverId : input.driverId,
-      input.deliveryStatus ?? order.deliveryStatus,
+      driverId,
+      deliveryStatus,
       input.cashCollected ?? order.cashCollected,
       input.reason ?? order.reason,
       now(),
