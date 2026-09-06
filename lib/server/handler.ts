@@ -51,6 +51,29 @@ const json = (
       ...headers,
     },
   });
+class StageError extends Error {
+  constructor(
+    public stage: string,
+    cause: unknown,
+  ) {
+    super(cause instanceof Error ? cause.message : 'Operation failed.');
+    this.name = cause instanceof Error ? cause.name : 'Error';
+    this.cause = cause;
+  }
+}
+async function stage<T>(name: string, work: Promise<T>) {
+  try {
+    return await work;
+  } catch (e) {
+    if (
+      e instanceof HttpError ||
+      e instanceof z.ZodError ||
+      e instanceof SyntaxError
+    )
+      throw e;
+    throw new StageError(name, e);
+  }
+}
 const cookie = (req: Request, value: string, age: number) =>
   `op_session=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${age}${new URL(req.url).protocol === 'https:' ? '; Secure' : ''}`;
 export async function handle(req: Request, env: Runtime): Promise<Response> {
@@ -106,17 +129,19 @@ export async function handle(req: Request, env: Runtime): Promise<Response> {
       );
     if (/BODY_TOO_LARGE/.test(message))
       return json({ error: 'Request too large.' }, 413);
+    const failedStage = e instanceof StageError ? e.stage : '';
     console.error(
       'OrderPilot request failed',
       new URL(req.url).pathname.replace(/\/[a-f0-9]{64}/g, '/[private]'),
       e instanceof Error ? e.name : 'Error',
+      failedStage ? `stage=${failedStage}` : '',
     );
     try {
       await platformEvent(
         database(env),
         'System',
         'Request error',
-        `${req.method} ${new URL(req.url).pathname.split('/').slice(0, 3).join('/')} · ${e instanceof Error ? e.name : 'Error'}`,
+        `${req.method} ${new URL(req.url).pathname.split('/').slice(0, 3).join('/')} · ${e instanceof Error ? e.name : 'Error'}${failedStage ? ` · ${failedStage}` : ''}`,
       ).run();
     } catch {}
     return json({ error: 'Something went wrong. Please try again.' }, 500);
@@ -193,36 +218,44 @@ async function route(req: Request, env: Runtime): Promise<Response> {
     );
   }
   if (p[0] === 'login' && method === 'POST') {
-    await rateLimit(req, db, 'login', 10);
+    await stage('login.rate_limit', rateLimit(req, db, 'login', 10));
     const input = await body(req, loginInput);
-    const signedIn = await auth(env).signIn(input.email, input.password);
+    const signedIn = await stage(
+      'login.supabase_auth',
+      auth(env).signIn(input.email, input.password),
+    );
     if (!signedIn) fail(401, 'Email or password is incorrect.');
-    const user = await one<User>(
-      db,
-      'SELECT id,tenantId,email,name,role,active FROM users WHERE id=? AND active=1',
-      signedIn!.id,
+    const user = await stage(
+      'login.profile_lookup',
+      one<User>(
+        db,
+        'SELECT id,tenantId,email,name,role,active FROM users WHERE id=? AND active=1',
+        signedIn!.id,
+      ),
     );
     if (!user) fail(401, 'Email or password is incorrect.');
     if (user!.tenantId) {
-      const t = await one<Tenant>(
-        db,
-        'SELECT * FROM tenants WHERE id=?',
-        user!.tenantId,
+      const t = await stage(
+        'login.tenant_lookup',
+        one<Tenant>(db, 'SELECT * FROM tenants WHERE id=?', user!.tenantId),
       );
       if (!t?.active || t.subscription === 'suspended')
         fail(403, 'Your business is suspended.');
     }
     const raw = token();
-    await db.batch([
-      stmt(db, 'DELETE FROM sessions WHERE expires<?', Date.now()),
-      stmt(
-        db,
-        'INSERT INTO sessions (id,userId,expires) VALUES (?,?,?)',
-        hash(raw),
-        user!.id,
-        Date.now() + 8 * 3600000,
-      ),
-    ]);
+    await stage(
+      'login.session_create',
+      db.batch([
+        stmt(db, 'DELETE FROM sessions WHERE expires<?', Date.now()),
+        stmt(
+          db,
+          'INSERT INTO sessions (id,userId,expires) VALUES (?,?,?)',
+          hash(raw),
+          user!.id,
+          Date.now() + 8 * 3600000,
+        ),
+      ]),
+    );
     return json({ role: user!.role }, 200, {
       'Set-Cookie': cookie(req, raw, 8 * 3600),
     });

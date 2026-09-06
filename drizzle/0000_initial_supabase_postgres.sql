@@ -402,9 +402,15 @@ DECLARE
   affected integer := 0;
   first_keyword text := upper(split_part(trim(rendered), ' ', 1));
 BEGIN
-  IF first_keyword IN ('SELECT', 'WITH') OR rendered ~* '\mRETURNING\M' THEN
+  IF first_keyword IN ('SELECT', 'WITH') THEN
     EXECUTE format(
       'SELECT COALESCE(jsonb_agg(to_jsonb(result_row)), ''[]''::jsonb) FROM (%s) result_row',
+      rendered
+    ) INTO result_rows;
+    affected := jsonb_array_length(result_rows);
+  ELSIF rendered ~* '\mRETURNING\M' THEN
+    EXECUTE format(
+      'WITH op_mutation AS (%s) SELECT COALESCE(jsonb_agg(to_jsonb(op_mutation)), ''[]''::jsonb) FROM op_mutation',
       rendered
     ) INTO result_rows;
     affected := jsonb_array_length(result_rows);

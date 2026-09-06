@@ -200,6 +200,27 @@ void test('Supabase API keys are not sent as JWT bearer tokens', () => {
   );
 });
 
+void test('Supabase RPC handles rate-limit writes with RETURNING', async () => {
+  const h = await harness();
+  const first = await h.get<{
+    result: { rows: { count: number }[]; count: number };
+  }>(
+    'SELECT op_query(?, ?::jsonb) result',
+    'INSERT INTO limits (key,count,expires) VALUES ($1,1,$2) ON CONFLICT(key) DO UPDATE SET count=limits.count+1 RETURNING count',
+    JSON.stringify(['rpc-returning-login-test', Date.now() + 600000]),
+  );
+  assert.deepEqual(first!.result, { rows: [{ count: 1 }], count: 1 });
+
+  const second = await h.get<{
+    result: { rows: { count: number }[]; count: number };
+  }>(
+    'SELECT op_query(?, ?::jsonb) result',
+    'INSERT INTO limits (key,count,expires) VALUES ($1,1,$2) ON CONFLICT(key) DO UPDATE SET count=limits.count+1 RETURNING count',
+    JSON.stringify(['rpc-returning-login-test', Date.now() + 600000]),
+  );
+  assert.deepEqual(second!.result, { rows: [{ count: 2 }], count: 1 });
+});
+
 void test('tenant isolation covers catalog, orders, storefronts and settings', async () => {
   const h = await setup();
   const date = new Date().toISOString();
