@@ -519,6 +519,50 @@ void test('super admin business search and logo creation stay authorized and ten
   assert.equal(((await cleared.json()) as { total: number }).total, 2);
 });
 
+void test('product creation generates a tenant-unique SKU on the server', async () => {
+  const h = await setup();
+  const input = {
+    name: 'Generated SKU product',
+    description: 'SKU generation fixture',
+    category: 'General',
+    sku: 'CLIENT-SUPPLIED-SKU',
+    price: 1200,
+    stock: 4,
+    lowStock: 1,
+    active: true,
+    image: '',
+    variants: [],
+    customFields: [],
+  };
+  const first = await h.request('products', 'POST', input, h.cookie);
+  const firstText = await first.text();
+  assert.equal(first.status, 200, firstText);
+  const firstId = (JSON.parse(firstText) as { id: string }).id;
+  const second = await h.request(
+    'products',
+    'POST',
+    { ...input, name: 'Generated SKU product 2' },
+    h.cookie,
+  );
+  const secondText = await second.text();
+  assert.equal(second.status, 200, secondText);
+  const secondId = (JSON.parse(secondText) as { id: string }).id;
+  const created = await h.get<{ sku: string }>(
+    'SELECT sku FROM products WHERE tenantId=? AND id=?',
+    h.tenant,
+    firstId,
+  );
+  const createdSecond = await h.get<{ sku: string }>(
+    'SELECT sku FROM products WHERE tenantId=? AND id=?',
+    h.tenant,
+    secondId,
+  );
+  assert.match(created!.sku, /^SKU-[A-F0-9]{12}$/);
+  assert.match(createdSecond!.sku, /^SKU-[A-F0-9]{12}$/);
+  assert.notEqual(created!.sku, 'CLIENT-SUPPLIED-SKU');
+  assert.notEqual(created!.sku, createdSecond!.sku);
+});
+
 void test('invalid business logos are rejected before tenant creation', async () => {
   const h = await setup();
   const adminCookie = await cookieForRole(h, 'super_admin');

@@ -148,6 +148,21 @@ async function tenantCreateBody(req: Request) {
     rawLogo instanceof File && rawLogo.size ? await filePayload(rawLogo) : null;
   return { input: tenantInput.parse(values), logo };
 }
+async function generatedSku(db: ReturnType<typeof database>, tenantId: string) {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const sku = `SKU-${uid().replace(/-/g, '').slice(0, 12).toUpperCase()}`;
+    if (
+      !(await one(
+        db,
+        'SELECT id FROM products WHERE tenantId=? AND sku=?',
+        tenantId,
+        sku,
+      ))
+    )
+      return sku;
+  }
+  fail(503, 'Could not generate a unique product SKU. Try again.');
+}
 export async function handle(req: Request, env: Runtime): Promise<Response> {
   try {
     if (
@@ -818,11 +833,21 @@ async function route(req: Request, env: Runtime): Promise<Response> {
       )
         fail(404, 'Product not found.');
       const id = method === 'POST' ? uid() : p[1];
+      const existing =
+        method === 'PATCH'
+          ? await one<{ sku: string }>(
+              db,
+              'SELECT sku FROM products WHERE tenantId=? AND id=?',
+              t,
+              id,
+            )
+          : null;
+      const sku = existing?.sku || (await generatedSku(db, t));
       const fields = [
         input.name,
         input.description,
         input.category,
-        input.sku,
+        sku,
         input.price,
         input.stock,
         input.lowStock,
@@ -854,7 +879,7 @@ async function route(req: Request, env: Runtime): Promise<Response> {
           user.name,
           'Product saved',
           null,
-          `${input.sku}: stock ${input.stock}`,
+          `${sku}: stock ${input.stock}`,
         ),
       ]);
       return json({ id });

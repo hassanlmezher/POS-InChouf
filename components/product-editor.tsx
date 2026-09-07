@@ -15,7 +15,6 @@ export default function ProductEditor({
   const [name, setName] = useState(product?.name || ''),
     [description, setDescription] = useState(product?.description || ''),
     [category, setCategory] = useState(product?.category || 'General'),
-    [sku, setSku] = useState(product?.sku || ''),
     [price, setPrice] = useState((product?.price ?? 0) / 100),
     [stock, setStock] = useState(product?.stock ?? 0),
     [lowStock, setLow] = useState(product?.lowStock ?? 5),
@@ -50,7 +49,6 @@ export default function ProductEditor({
                 name,
                 description,
                 category,
-                sku,
                 price: Math.round(price * 100),
                 stock,
                 lowStock,
@@ -73,13 +71,6 @@ export default function ProductEditor({
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              required
-            />
-          </Field>
-          <Field label="SKU">
-            <input
-              value={sku}
-              onChange={(e) => setSku(e.target.value)}
               required
             />
           </Field>
