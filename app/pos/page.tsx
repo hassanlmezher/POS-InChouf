@@ -1223,7 +1223,8 @@ function OrderTable({
         {
           status: next.status,
           deliveryMethod: order.deliveryMethod,
-          driverId: order.deliveryMethod === 'external_courier' ? null : undefined,
+          driverId:
+            order.deliveryMethod === 'external_courier' ? null : undefined,
           deliveryProvider:
             order.deliveryMethod === 'external_courier'
               ? order.deliveryProvider
@@ -1275,17 +1276,6 @@ function OrderTable({
           {orders.map((o) => {
             const busy = busyId === o.id;
             const normal = primary[o.status];
-            const statusExceptions = transitions[o.status].filter(
-              (s) =>
-                [
-                  'Cancelled',
-                  'Returned',
-                  'Needs Attention',
-                  'Failed Delivery',
-                ].includes(s) &&
-                (user.role !== 'picker' || s === 'Needs Attention') &&
-                user.role !== 'delivery_manager',
-            );
             const deliveryExceptions = [
               'Failed',
               'Customer unavailable',
@@ -1296,6 +1286,18 @@ function OrderTable({
                 transitions[o.status].includes(
                   deliveryExceptionStatus[s] as never,
                 ),
+            );
+            const statusExceptions = transitions[o.status].filter(
+              (s) =>
+                [
+                  'Cancelled',
+                  'Returned',
+                  'Needs Attention',
+                  'Failed Delivery',
+                ].includes(s) &&
+                (user.role !== 'picker' || s === 'Needs Attention') &&
+                user.role !== 'delivery_manager' &&
+                !(s === 'Returned' && deliveryExceptions.includes('Returned')),
             );
             return (
               <TableRow key={o.id}>
