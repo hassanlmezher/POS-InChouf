@@ -47,6 +47,11 @@ export default function Checkout({
     [error, setError] = useState(''),
     [idempotency] = useState(() => crypto.randomUUID());
   const zone = zones.find((z) => z.id === zoneId);
+  const unavailable = !zones.length;
+  const stockIssue = lines.find((line) => {
+    const p = products.find((p) => p.id === line.productId);
+    return !p || p.stock < line.quantity || p.stock <= 0;
+  });
   const subtotal = lines.reduce((sum, line) => {
     const p = products.find((p) => p.id === line.productId);
     if (!p) return sum;
@@ -65,6 +70,16 @@ export default function Checkout({
       className="form-stack"
       onSubmit={async (e) => {
         e.preventDefault();
+        if (unavailable) {
+          setError(
+            'Delivery is unavailable because this business has not configured a delivery zone.',
+          );
+          return;
+        }
+        if (!lines.length || stockIssue) {
+          setError('Stock changed. Please review your bag before checkout.');
+          return;
+        }
         setBusy(true);
         setError('');
         try {
@@ -132,15 +147,22 @@ export default function Checkout({
           required
         />
       </Field>
-      <Choice
-        label="Delivery zone"
-        value={zoneId}
-        onChange={setZone}
-        options={zones.map((z) => ({
-          value: z.id,
-          label: `${z.name} · ${money(z.fee)}`,
-        }))}
-      />
+      {unavailable ? (
+        <div className="error-box" role="alert">
+          Delivery is unavailable because this business has not configured a
+          delivery zone yet.
+        </div>
+      ) : (
+        <Choice
+          label="Delivery zone"
+          value={zoneId}
+          onChange={setZone}
+          options={zones.map((z) => ({
+            value: z.id,
+            label: `${z.name} · ${money(z.fee)}`,
+          }))}
+        />
+      )}
       {zone && (
         <p>
           <small>
@@ -175,7 +197,7 @@ export default function Checkout({
         </div>
       </div>
       <ErrorBox error={error} />
-      <Submit busy={busy || !zone || !lines.length}>
+      <Submit busy={busy} disabled={!zone || !lines.length || !!stockIssue}>
         Place order · {money(subtotal + fee)}
       </Submit>
       <small>

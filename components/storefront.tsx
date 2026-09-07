@@ -117,6 +117,7 @@ export default function Storefront({ slug }: { slug: string }) {
     );
   const { tenant, products, zones } = r.data,
     s = settingsOf(tenant),
+    logo = s.branding?.logoId ? `/api/store/${slug}/logo` : '',
     filtered = products.filter(
       (p) =>
         (category === 'All products' || p.category === category) &&
@@ -133,8 +134,29 @@ export default function Storefront({ slug }: { slug: string }) {
     );
   };
   const total = cart.reduce((s, l) => s + priceOf(l) * l.quantity, 0);
+  const cartStockIssue = cart.some((line) => {
+    const p = products.find((product) => product.id === line.productId);
+    return !p || p.stock <= 0 || line.quantity > Math.min(p.stock, 100);
+  });
   const add = (line: CartLine) => {
-    setCart([...cart, line]);
+    const product = products.find((p) => p.id === line.productId);
+    if (!product || product.stock <= 0) return;
+    const max = Math.min(product.stock, 100);
+    const quantity = Math.min(max, line.quantity);
+    setCart((existing) => {
+      const index = existing.findIndex(
+        (item) =>
+          item.productId === line.productId &&
+          item.variant === line.variant &&
+          JSON.stringify(item.custom) === JSON.stringify(line.custom),
+      );
+      if (index === -1) return [...existing, { ...line, quantity }];
+      return existing.map((item, itemIndex) =>
+        itemIndex === index
+          ? { ...item, quantity: Math.min(max, item.quantity + quantity) }
+          : item,
+      );
+    });
     setSelected(null);
     setCartOpen(true);
   };
@@ -147,7 +169,11 @@ export default function Storefront({ slug }: { slug: string }) {
       )}
       <header className="store-nav">
         <a href={`/store/${slug}`} className="store-brand">
-          <span className="brand-mark">i</span>
+          {logo ? (
+            <img className="tenant-logo" src={logo} alt={`${tenant.name} logo`} />
+          ) : (
+            <span className="brand-mark">i</span>
+          )}
           {slug === 'internal-demo' ? 'The Demo Collection' : tenant.name}
         </a>
         <div className="store-nav-links">
@@ -282,7 +308,9 @@ export default function Storefront({ slug }: { slug: string }) {
               {filtered.map((p) => (
                 <article className="store-product" key={p.id}>
                   <button
-                    className="store-product-photo"
+                    className={
+                      'store-product-photo ' + (p.stock === 0 ? 'disabled' : '')
+                    }
                     onClick={() => setSelected(p)}
                     aria-label={`View ${p.name}`}
                   >
@@ -295,6 +323,9 @@ export default function Storefront({ slug }: { slug: string }) {
                     <span className="product-open">
                       <Plus size={20} />
                     </span>
+                    {p.stock === 0 && (
+                      <span className="badge red stock-badge">Out of stock</span>
+                    )}
                   </button>
                   <div className="store-product-info">
                     <div>
@@ -305,7 +336,7 @@ export default function Storefront({ slug }: { slug: string }) {
                     </div>
                     <strong>{money(p.price)}</strong>
                   </div>
-                  {p.stock === 0 && <small>Currently out of stock</small>}
+                  {p.stock === 0 && <small>Out of stock</small>}
                 </article>
               ))}
             </div>
@@ -445,6 +476,8 @@ export default function Storefront({ slug }: { slug: string }) {
                 <div className="form-stack">
                   {cart.map((l, i) => {
                     const p = products.find((p) => p.id === l.productId)!;
+                    const max = Math.min(p.stock, 100);
+                    const overStock = l.quantity > max || p.stock === 0;
                     return (
                       <div className="cart-line" key={i}>
                         <div className="cart-photo">
@@ -454,6 +487,11 @@ export default function Storefront({ slug }: { slug: string }) {
                           <h3>{p.name}</h3>
                           <small>{l.variant}</small>
                           <strong>{money(priceOf(l))}</strong>
+                          {overStock && (
+                            <small className="danger-text">
+                              Only {Math.max(0, max)} units available.
+                            </small>
+                          )}
                           <div className="quantity-control">
                             <button
                               aria-label={`Decrease ${p.name}`}
@@ -474,7 +512,7 @@ export default function Storefront({ slug }: { slug: string }) {
                             <span>{l.quantity}</span>
                             <button
                               aria-label={`Increase ${p.name}`}
-                              disabled={l.quantity >= Math.min(p.stock, 100)}
+                              disabled={l.quantity >= max}
                               onClick={() =>
                                 setCart(
                                   cart.map((x, n) =>
@@ -505,7 +543,11 @@ export default function Storefront({ slug }: { slug: string }) {
                     <span>{money(total)}</span>
                   </div>
                   <small>Delivery calculated at checkout.</small>
-                  <button className="button" onClick={() => setCheckout(true)}>
+                  <button
+                    className="button"
+                    disabled={cartStockIssue}
+                    onClick={() => setCheckout(true)}
+                  >
                     Continue to checkout <ArrowRight size={16} />
                   </button>
                 </div>
@@ -545,6 +587,8 @@ function ProductDialog({
     [quantity, setQuantity] = useState(1),
     [custom, setCustom] = useState<Record<string, string>>({});
   const price = variants.find((v) => v.name === variant)?.price ?? p.price;
+  const max = Math.min(p.stock, 100);
+  const validQuantity = p.stock > 0 && quantity >= 1 && quantity <= max;
   return (
     <Modal open title={p.name} description={p.description} onClose={onClose}>
       <div className="product-detail-photo">
@@ -554,12 +598,15 @@ function ProductDialog({
         className="form-stack"
         onSubmit={(e) => {
           e.preventDefault();
+          if (!validQuantity) return;
           add({ productId: p.id, quantity, variant, custom });
         }}
       >
         <div className="section-heading">
           <strong style={{ fontSize: 25 }}>{money(price)}</strong>
-          <span className="badge green">{p.stock} available</span>
+          <span className={'badge ' + (p.stock === 0 ? 'red' : 'green')}>
+            {p.stock === 0 ? 'Out of stock' : `${p.stock} available`}
+          </span>
         </div>
         {variants.length > 0 && (
           <Choice
@@ -573,12 +620,18 @@ function ProductDialog({
           <input
             type="number"
             min="1"
-            max={Math.min(p.stock, 100)}
+            max={max}
             value={quantity}
-            onChange={(e) => setQuantity(+e.target.value)}
+            onChange={(e) => {
+              const next = Number(e.target.value);
+              setQuantity(Number.isFinite(next) ? Math.min(Math.max(1, next), max || 1) : 1);
+            }}
             required
           />
         </Field>
+        {quantity > max && (
+          <small className="danger-text">Only {max} units available.</small>
+        )}
         {fields
           .filter((f) => f.type === 'text')
           .map((f) => (
@@ -604,7 +657,7 @@ function ProductDialog({
         )}
         <button
           className="button"
-          disabled={p.stock === 0 || quantity < 1}
+          disabled={!validQuantity}
           type="submit"
         >
           {p.stock === 0

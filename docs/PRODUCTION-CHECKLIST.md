@@ -1,6 +1,7 @@
 # Before onboarding a real business
 
 - [ ] Verify the deployed Worker, Supabase migrations/RLS, R2 uploads and independent Supabase Auth login on the final public hostname.
+- [ ] Apply `drizzle/0003_delivery_branding_settlements.sql` to production before testing external courier delivery, tenant logos or cash settlements.
 - [ ] Resolve public access and custom-domain DNS/certificate validation; test wildcard tenant routing.
 - [ ] Replace platform contacts in `config/contact.ts` and rebuild promotional outputs.
 - [ ] Rotate initial demo/admin passwords and keep private credentials out of Git, screenshots and chat.
@@ -9,6 +10,8 @@
 - [ ] Confirm Starter employee seats and manual subscription policy with the first merchant.
 - [ ] Configure the merchant's own products/images, categories, delivery zones, contacts and payment instructions.
 - [ ] Exercise the full order/return/refund/cash reconciliation workflow with the merchant.
+- [ ] Verify internal-driver handoff requires an assigned driver and external-courier handoff works without forcing the owner to become driver.
+- [ ] Verify Picker/Packer users cannot access server-side order export or owner-only settlement endpoints.
 - [ ] Load-test checkout concurrency, Supabase RPC/Auth limits and R2 storage limits on the actual plans.
 - [ ] Decide whether pooled product stock is sufficient or independent variant inventories are needed.
 - [ ] Decide whether 500-record analytics need server-side pagination and wider aggregate reports for the merchant's volume.

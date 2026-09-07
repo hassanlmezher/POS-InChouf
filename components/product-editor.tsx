@@ -132,7 +132,18 @@ export default function ProductEditor({
             onChange={async (e) => {
               const f = e.target.files?.[0];
               if (!f) return;
+              if (!['image/png', 'image/jpeg'].includes(f.type)) {
+                setError('Choose a PNG or JPEG product image.');
+                e.currentTarget.value = '';
+                return;
+              }
+              if (f.size > 5 * 1024 * 1024) {
+                setError('Product image must be smaller than 5 MB.');
+                e.currentTarget.value = '';
+                return;
+              }
               setBusy(true);
+              setError('');
               try {
                 const r = await uploadFile('files', f);
                 setImage(`/api/images/${r.id}`);

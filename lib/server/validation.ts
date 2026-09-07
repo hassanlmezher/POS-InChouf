@@ -137,6 +137,10 @@ export const updateOrderInput = z
     payment: z.enum(['Unpaid', 'Paid', 'Refunded']).optional(),
     employeeId: id.nullable().optional(),
     driverId: id.nullable().optional(),
+    deliveryMethod: z
+      .enum(['internal_driver', 'external_courier'])
+      .optional(),
+    deliveryProvider: z.string().trim().max(120).optional(),
     deliveryStatus: z
       .enum([
         'Pending',
@@ -151,6 +155,16 @@ export const updateOrderInput = z
     cashCollected: cents.optional(),
     reason: text.optional(),
     note: text.optional(),
+  })
+  .strict();
+export const settlementInput = z
+  .object({
+    method: z.enum(['internal_driver', 'external_courier']),
+    driverId: id.nullable().optional(),
+    provider: z.string().trim().max(120).optional(),
+    periodStart: z.iso.datetime().nullable().optional(),
+    periodEnd: z.iso.datetime().nullable().optional(),
+    actual: cents,
   })
   .strict();
 export const settingsInput = z

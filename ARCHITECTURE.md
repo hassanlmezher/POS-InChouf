@@ -27,16 +27,22 @@ The browser never selects the tenant for an authenticated API request. The sessi
 
 Every tenant-owned table has tenantid and is protected in two ways: all Worker queries include tenant predicates and membership/assignment checks, while PostgreSQL enables RLS policies for direct Supabase API access. Policies use auth.uid() and the profile's active tenant/role. Composite foreign keys bind order lines, zones, employee assignments, files and proofs to the same tenant. The Worker uses the server-only service role through a private HTTP RPC, so no service key reaches the client and public PostgREST access cannot bypass these policies.
 
-## Files and order consistency
+## Files, delivery and order consistency
 
 R2 remains private because the existing upload/download implementation already validates file signatures, tenant/order scope and tracking capability. Keeping R2 avoids a second storage API and migration of existing object keys. Catalog images are public only through the controlled image route when attached to an active product in an active business.
 
+Tenant branding uses the existing tenant settings document with a server-owned `branding.logoId`. Logos are stored in the tenant's R2 namespace and served only through a tenant-resolved storefront route; callers cannot request arbitrary logo IDs or object keys.
+
 Checkout validates catalog data, options, required text, delivery zone, minimums and payment methods on the server. Integer cents avoid floating-point totals. PostgreSQL triggers reserve stock transactionally, restore it once on cancellation/return, enforce proof scope/locking and prevent packing before proof approval. SKU, idempotency and version checks protect duplicate and concurrent writes.
+
+Delivery supports two explicit methods. Internal delivery requires an active owner or delivery manager assigned as `driverId`; external courier delivery records `deliveryMethod=external_courier` and an optional provider without forcing an InChouf user account. Cash reconciliation is modeled as immutable settlement batches for internal drivers or external providers. Settlement rows calculate expected COD from eligible delivered orders, record actual returned cash and variance, and a unique settlement-order constraint prevents accidental double settlement.
+
+Operational views use lightweight polling rather than aggressive realtime subscriptions: order and proof queues refresh about every 15 seconds while visible, and admin/customer/audit/settlement lists refresh about every 30 seconds. Mutations still revalidate affected resources immediately after save.
 
 ## Operational choices
 
 - Starter is one owner and up to two active employees.
-- Payment methods and subscription status are manual; no online payment is processed.
+- Payment methods, COD settlements and subscription status are manual; no online payment is processed.
 - Public tracking exposes limited order data and supports account-free proof review.
 - The application has no required messaging, courier, marketplace or AI integration.
 - File retention and malware scanning remain operational responsibilities for production.

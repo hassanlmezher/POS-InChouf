@@ -7,8 +7,10 @@ OrderPilot remains a Vinext application deployed as a Cloudflare Worker through 
 1. Create or select the Supabase project.
 2. From Project Settings > API, copy the Project URL, publishable/anon key and server-only secret/service-role key.
 3. From Connect, copy the PostgreSQL URI for local migrations. Use the transaction pooler URI on port 6543 when available.
-4. Run `npm run db:migrate` with `SUPABASE_DATABASE_URL` set, or run the generated SQL in `drizzle/0000_initial_supabase_postgres.sql` in the Supabase SQL Editor.
+4. Run `npm run db:migrate` with `SUPABASE_DATABASE_URL` set, or run the generated SQL files in order in the Supabase SQL Editor.
 5. Confirm the migration created the RLS policies, integrity triggers and private RPC functions `op_query` and `op_batch`.
+
+For existing production databases, apply `drizzle/0003_delivery_branding_settlements.sql` before using external-courier delivery, tenant logos or cash settlements. The migration is additive: it adds delivery method/provider columns, settlement tables, tenant indexes and RLS policies.
 
 The service-role key is required only by the Worker server runtime and must never be placed in client-exposed Vite variables. The bootstrap endpoint creates the first Supabase Auth-backed `super_admin` profile once; remove `BOOTSTRAP_TOKEN` after provisioning.
 
@@ -25,6 +27,8 @@ Configure these Worker variables/secrets exactly:
 Keep the existing R2 bucket binding `FILES` → `site-creator-r2`. The configuration must not include `d1` or `d1_databases`. `SUPABASE_DATABASE_URL` is for local/CI migration commands only and is not required in the Worker.
 
 The exact temporary Worker hostname `pos-inchouf.hassanmezher084.workers.dev` is explicitly allowlisted for testing. Other workers.dev hostnames remain rejected. `SITE_HOST=inchouf.com` continues to govern the production custom-domain architecture.
+
+Production custom domains currently expected by the application are `inchouf.com`, `app.inchouf.com`, `admin.inchouf.com` and wildcard tenant subdomains under `inchouf.com`.
 
 ### Cloudflare CI build commands
 

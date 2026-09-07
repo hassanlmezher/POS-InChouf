@@ -95,6 +95,9 @@ export interface Settings {
   paymentOptions: string[];
   categories: string[];
   currency: string;
+  branding?: {
+    logoId?: string;
+  };
 }
 export const defaultSettings: Settings = {
   tagline: 'Thoughtful finds. Delivered to you.',
@@ -161,6 +164,8 @@ export interface Order {
   notes: string;
   employeeId: string | null;
   driverId: string | null;
+  deliveryMethod: 'internal_driver' | 'external_courier';
+  deliveryProvider: string;
   deliveryStatus: string;
   cashCollected: number;
   reason: string;
@@ -183,6 +188,21 @@ export interface Event {
   detail: string;
   createdAt: string;
   public: number;
+}
+export interface Settlement {
+  id: string;
+  tenantId: string;
+  method: 'internal_driver' | 'external_courier';
+  driverId: string | null;
+  provider: string;
+  periodStart: string | null;
+  periodEnd: string | null;
+  expected: number;
+  actual: number;
+  variance: number;
+  status: 'balanced' | 'missing' | 'extra';
+  createdBy: string;
+  createdAt: string;
 }
 export interface Proof {
  contentType?: string;

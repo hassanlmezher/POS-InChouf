@@ -5,16 +5,23 @@ export async function api<T>(
   method: string = 'GET',
   data?: unknown,
 ): Promise<T> {
+  const multipart =
+    typeof FormData !== 'undefined' && data instanceof FormData;
   const res = await fetch(`/api/${path}`, {
     method,
-    headers: data ? { 'Content-Type': 'application/json' } : undefined,
-    ...(method !== 'GET' && data ? {body: JSON.stringify(data)} : {}),
+    headers: data && !multipart ? { 'Content-Type': 'application/json' } : undefined,
+    ...(method !== 'GET' && data
+      ? { body: multipart ? data : JSON.stringify(data) }
+      : {}),
   });
   const value = (await res.json()) as T & { error?: string };
   if (!res.ok) throw new Error(value.error || 'Request failed.');
   return value as T;
 }
-export function useResource<T>(path: string | null) {
+export function useResource<T>(
+  path: string | null,
+  options: { intervalMs?: number } = {},
+) {
   const [data, setData] = useState<T | null>(null),
     [error, setError] = useState(''),
     [loading, setLoading] = useState(true);
@@ -36,12 +43,20 @@ export function useResource<T>(path: string | null) {
     setLoading(true);
     void refresh();
   }, [refresh]);
+  useEffect(() => {
+    if (!path || !options.intervalMs) return;
+    const timer = window.setInterval(() => void refresh(), options.intervalMs);
+    return () => window.clearInterval(timer);
+  }, [path, options.intervalMs, refresh]);
   return { data, error, loading, refresh, setData };
 }
 export async function uploadFile(path: string, file: File) {
   const res = await fetch(`/api/${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': file.type, 'X-File-Name': file.name },
+    headers: {
+      'Content-Type': file.type,
+      'X-File-Name': encodeURIComponent(file.name),
+    },
     body: file,
   });
   const data = (await res.json()) as {

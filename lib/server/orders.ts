@@ -14,6 +14,24 @@ import {
   type Order,
   type Status,
 } from '../types';
+
+const deliveryMethodLabel = (method: string) =>
+  method === 'external_courier' ? 'External courier' : 'Internal driver';
+
+async function userName(
+  db: ReturnType<typeof database>,
+  tenantId: string,
+  idValue: string | null,
+) {
+  if (!idValue) return 'None';
+  const user = await one<{ name: string }>(
+    db,
+    'SELECT name FROM users WHERE tenantId=? AND id=?',
+    tenantId,
+    idValue,
+  );
+  return user?.name || 'Unknown employee';
+}
 export async function placeOrder(
   env: Runtime,
   t: Tenant,
@@ -237,12 +255,25 @@ export async function updateOrder(
     !input.note?.trim()
   )
     fail(400, 'Add a reason for this status change.');
-  let driverId = input.driverId === undefined ? order.driverId : input.driverId;
-  if (status === 'Out for Delivery' && !driverId) {
-    if (user.role !== 'owner' || input.driverId !== undefined)
-      fail(400, 'Assign a driver before sending the order.');
-    driverId = user.id;
-  }
+  if (
+    input.deliveryMethod !== undefined ||
+    input.deliveryProvider !== undefined
+  )
+    requireRole(user, ['owner', 'order_manager']);
+  const driverId =
+    input.driverId === undefined ? order.driverId : input.driverId;
+  const deliveryMethod =
+    input.deliveryMethod ?? order.deliveryMethod ?? 'internal_driver';
+  const deliveryProvider =
+    input.deliveryProvider === undefined
+      ? order.deliveryProvider || ''
+      : input.deliveryProvider;
+  if (
+    status === 'Out for Delivery' &&
+    deliveryMethod === 'internal_driver' &&
+    !driverId
+  )
+    fail(400, 'Assign a driver or choose external courier before handoff.');
   const deliveryStatus =
     input.deliveryStatus ??
     (status === 'Out for Delivery' && status !== order.status
@@ -274,21 +305,62 @@ export async function updateOrder(
   }
   if (input.payment !== undefined)
     requireRole(user, ['owner', 'order_manager']);
+  const cashCollected = input.cashCollected ?? order.cashCollected;
   if (input.cashCollected !== undefined) {
     requireRole(user, ['owner', 'delivery_manager']);
     if (input.cashCollected > order.total)
       fail(400, 'Cash collected cannot exceed the order total.');
   }
+  let payment = input.payment ?? order.payment;
+  if (
+    order.paymentMethod === 'Cash on delivery' &&
+    cashCollected >= order.total &&
+    payment !== 'Refunded'
+  )
+    payment = 'Paid';
+  const changes: string[] = [];
+  if (status !== order.status)
+    changes.push(`Order status: ${order.status} -> ${status}`);
+  if (deliveryStatus !== order.deliveryStatus)
+    changes.push(`Delivery status: ${order.deliveryStatus} -> ${deliveryStatus}`);
+  if ((order.deliveryMethod || 'internal_driver') !== deliveryMethod)
+    changes.push(
+      `Delivery method: ${deliveryMethodLabel(order.deliveryMethod)} -> ${deliveryMethodLabel(deliveryMethod)}`,
+    );
+  if ((order.deliveryProvider || '') !== deliveryProvider)
+    changes.push(
+      `Delivery provider: ${order.deliveryProvider || 'None'} -> ${deliveryProvider || 'None'}`,
+    );
+  if (order.employeeId !== (input.employeeId === undefined ? order.employeeId : input.employeeId))
+    changes.push(
+      `Assigned employee: ${await userName(db, t, order.employeeId)} -> ${await userName(db, t, input.employeeId ?? null)}`,
+    );
+  if (order.driverId !== driverId)
+    changes.push(
+      `Driver assigned: ${await userName(db, t, order.driverId)} -> ${await userName(db, t, driverId)}`,
+    );
+  if (order.payment !== payment) changes.push(`Payment: ${order.payment} -> ${payment}`);
+  if (order.cashCollected !== cashCollected)
+    changes.push(
+      `Cash collected: ${(order.cashCollected / 100).toFixed(2)} -> ${(cashCollected / 100).toFixed(2)}`,
+    );
+  const detail =
+    changes.join('; ') ||
+    input.note ||
+    input.reason ||
+    'Order note saved';
   const result = await db.batch([
     stmt(
       db,
-      'UPDATE orders SET status=?,payment=?,employeeId=?,driverId=?,deliveryStatus=?,cashCollected=?,reason=?,version=version+1,updatedAt=? WHERE tenantId=? AND id=? AND version=?',
+      'UPDATE orders SET status=?,payment=?,employeeId=?,driverId=?,deliveryMethod=?,deliveryProvider=?,deliveryStatus=?,cashCollected=?,reason=?,version=version+1,updatedAt=? WHERE tenantId=? AND id=? AND version=?',
       status,
-      input.payment ?? order.payment,
+      payment,
       input.employeeId === undefined ? order.employeeId : input.employeeId,
       driverId,
+      deliveryMethod,
+      deliveryProvider,
       deliveryStatus,
-      input.cashCollected ?? order.cashCollected,
+      cashCollected,
       input.reason ?? order.reason,
       now(),
       t,
@@ -301,7 +373,7 @@ export async function updateOrder(
       user.name,
       status !== order.status ? status : 'Order updated',
       id,
-      input.note || input.reason || 'Order details updated',
+      detail,
       status !== order.status,
     ),
   ]);

@@ -1,6 +1,13 @@
 'use client';
-import { useState } from 'react';
-import { Plus, ArrowUpRight, LogOut, ShieldCheck } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import {
+  Plus,
+  ArrowUpRight,
+  LogOut,
+  ShieldCheck,
+  Search,
+  X,
+} from 'lucide-react';
 import {
   Brand,
   Loading,
@@ -25,10 +32,47 @@ import { api, useResource, message } from '@/lib/client';
 import { type User, type Tenant, type Event, money } from '@/lib/types';
 export default function Admin() {
   const me = useResource<{ user: User }>('me');
+  const [query, setQuery] = useState(''),
+    [debouncedQuery, setDebouncedQuery] = useState(''),
+    [activeFilter, setActiveFilter] = useState('all'),
+    [subscriptionFilter, setSubscriptionFilter] = useState('all'),
+    [page, setPage] = useState(0);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedQuery(query.trim());
+      setPage(0);
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+  const params = new URLSearchParams({
+    limit: '25',
+    offset: String(page * 25),
+  });
+  if (debouncedQuery) params.set('q', debouncedQuery);
+  if (activeFilter !== 'all') params.set('active', activeFilter);
+  if (subscriptionFilter !== 'all')
+    params.set('subscription', subscriptionFilter);
   const r = useResource<{
-    tenants: (Tenant & { orderCount: number; userCount: number })[];
+    tenants: (Tenant & {
+      orderCount: number;
+      userCount: number;
+      ownerEmail?: string;
+    })[];
+    total: number;
+    summary: {
+      activeCount: number;
+      suspendedCount: number;
+      monthlyValue: number;
+    };
+    limit: number;
+    offset: number;
     events: Event[];
-  }>(me.data?.user.role === 'super_admin' ? 'admin/tenants' : null);
+  }>(
+    me.data?.user.role === 'super_admin'
+      ? `admin/tenants?${params.toString()}`
+      : null,
+    { intervalMs: 30000 },
+  );
   const [create, setCreate] = useState(false),
     [edit, setEdit] = useState<Tenant | null>(null),
     [reset, setReset] = useState<Tenant | null>(null);
@@ -44,6 +88,17 @@ export default function Admin() {
       </main>
     );
   const tenants = r.data?.tenants || [];
+  const total = r.data?.total ?? tenants.length;
+  const summary = r.data?.summary ?? {
+    activeCount: tenants.filter((t) => t.active && t.subscription !== 'suspended')
+      .length,
+    suspendedCount: tenants.filter(
+      (t) => !t.active || t.subscription === 'suspended',
+    ).length,
+    monthlyValue: tenants
+      .filter((t) => t.active && t.subscription === 'active')
+      .reduce((s, t) => s + t.price, 0),
+  };
   const saved = () => {
     setCreate(false);
     setEdit(null);
@@ -85,25 +140,10 @@ export default function Admin() {
         </div>
         <div className="metric-grid admin-stats">
           {[
-            ['Businesses', tenants.length],
-            [
-              'Active businesses',
-              tenants.filter((t) => t.active && t.subscription !== 'suspended')
-                .length,
-            ],
-            [
-              'Suspended',
-              tenants.filter((t) => !t.active || t.subscription === 'suspended')
-                .length,
-            ],
-            [
-              'Configured monthly value',
-              money(
-                tenants
-                  .filter((t) => t.active && t.subscription === 'active')
-                  .reduce((s, t) => s + t.price, 0),
-              ),
-            ],
+            ['Businesses', total],
+            ['Active businesses', summary.activeCount],
+            ['Suspended', summary.suspendedCount],
+            ['Configured monthly value', money(summary.monthlyValue)],
           ].map(([a, b]) => (
             <div className="metric" key={a}>
               <span>{a}</span>
@@ -120,7 +160,65 @@ export default function Admin() {
         <div className="panel">
           <div className="panel-head">
             <h3>Businesses</h3>
-            <small>{tenants.length} total</small>
+            <small>
+              {tenants.length} shown · {total} matching
+            </small>
+          </div>
+          <div className="table-toolbar admin-search">
+            <div className="search-wrap">
+              <Search />
+              <input
+                className="search-input"
+                placeholder="Search business, slug, domain or owner email"
+                aria-label="Search businesses"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </div>
+            <Choice
+              label="Enabled"
+              value={activeFilter}
+              onChange={(v) => {
+                setActiveFilter(v);
+                setPage(0);
+              }}
+              options={[
+                { value: 'all', label: 'All' },
+                { value: 'enabled', label: 'Enabled' },
+                { value: 'disabled', label: 'Disabled' },
+              ]}
+            />
+            <Choice
+              label="Subscription"
+              value={subscriptionFilter}
+              onChange={(v) => {
+                setSubscriptionFilter(v);
+                setPage(0);
+              }}
+              options={[
+                { value: 'all', label: 'All statuses' },
+                'trial',
+                'active',
+                'past_due',
+                'suspended',
+                'cancelled',
+              ]}
+            />
+            {(query || activeFilter !== 'all' || subscriptionFilter !== 'all') && (
+              <button
+                className="button secondary small"
+                onClick={() => {
+                  setQuery('');
+                  setDebouncedQuery('');
+                  setActiveFilter('all');
+                  setSubscriptionFilter('all');
+                  setPage(0);
+                }}
+              >
+                <X size={15} />
+                Clear
+              </button>
+            )}
           </div>
           <Table className="op-table">
             <TableHeader>
@@ -142,6 +240,7 @@ export default function Admin() {
                   <TableCell>
                     <strong>{t.name}</strong>
                     <small>{t.slug}.inchouf.com</small>
+                    {t.ownerEmail && <small>Owner: {t.ownerEmail}</small>}
                     {t.slug === 'internal-demo' && (
                       <span className="badge">Internal testing only</span>
                     )}
@@ -182,10 +281,41 @@ export default function Admin() {
               ))}
             </TableBody>
           </Table>
+          {total > 25 && (
+            <div className="panel-body inline-actions">
+              <button
+                className="button secondary small"
+                disabled={page === 0}
+                onClick={() => setPage(Math.max(0, page - 1))}
+              >
+                Previous
+              </button>
+              <span className="badge">Page {page + 1}</span>
+              <button
+                className="button secondary small"
+                disabled={(page + 1) * 25 >= total}
+                onClick={() => setPage(page + 1)}
+              >
+                Next
+              </button>
+            </div>
+          )}
           {!tenants.length && (
             <EmptyState
-              title="No businesses yet"
-              description="Create a business when you are ready to onboard its owner."
+              title={
+                debouncedQuery ||
+                activeFilter !== 'all' ||
+                subscriptionFilter !== 'all'
+                  ? 'No businesses matched'
+                  : 'No businesses yet'
+              }
+              description={
+                debouncedQuery ||
+                activeFilter !== 'all' ||
+                subscriptionFilter !== 'all'
+                  ? 'Clear the search or adjust filters to restore the full list.'
+                  : 'Create a business when you are ready to onboard its owner.'
+              }
             />
           )}
         </div>
@@ -252,8 +382,19 @@ function CreateBusiness({
       email: '',
       password: '',
     }),
+    [logo, setLogo] = useState<File | null>(null),
+    [preview, setPreview] = useState(''),
     [busy, setBusy] = useState(false),
     [error, setError] = useState('');
+  useEffect(() => {
+    if (!logo) {
+      setPreview('');
+      return;
+    }
+    const url = URL.createObjectURL(logo);
+    setPreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [logo]);
   return (
     <Modal
       open
@@ -266,8 +407,14 @@ function CreateBusiness({
         onSubmit={async (e) => {
           e.preventDefault();
           setBusy(true);
+          setError('');
           try {
-            await api('admin/tenants', 'POST', data);
+            const form = new FormData();
+            Object.entries(data).forEach(([key, value]) =>
+              form.set(key, value),
+            );
+            if (logo) form.set('logo', logo);
+            await api('admin/tenants', 'POST', form);
             saved();
           } catch (e) {
             setError(message(e));
@@ -303,6 +450,35 @@ function CreateBusiness({
             />
           </Field>
         ))}
+        <Field
+          label="Business logo"
+          hint="PNG or JPEG, up to 5 MB. The logo is stored privately in R2 and served only for this business."
+        >
+          <input
+            type="file"
+            accept="image/png,image/jpeg"
+            onChange={(e) => {
+              const file = e.target.files?.[0] || null;
+              if (file && !['image/png', 'image/jpeg'].includes(file.type)) {
+                setError('Choose a PNG or JPEG logo.');
+                e.currentTarget.value = '';
+                return;
+              }
+              if (file && file.size > 5 * 1024 * 1024) {
+                setError('Logo must be smaller than 5 MB.');
+                e.currentTarget.value = '';
+                return;
+              }
+              setError('');
+              setLogo(file);
+            }}
+          />
+        </Field>
+        {preview && (
+          <div className="logo-preview">
+            <img src={preview} alt="Selected business logo preview" />
+          </div>
+        )}
         <ErrorBox error={error} />
         <Submit busy={busy}>Create business and owner</Submit>
       </form>

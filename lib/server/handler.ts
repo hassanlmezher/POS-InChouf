@@ -9,6 +9,7 @@ import {
   checkoutInput,
   updateOrderInput,
   settingsInput,
+  settlementInput,
 } from './validation';
 import {
   type Runtime,
@@ -36,7 +37,14 @@ import {
 } from './security';
 import { auth } from './supabase';
 import { placeOrder, orderDetail, updateOrder } from './orders';
-import { type Tenant, type User, type Order, defaultSettings } from '../types';
+import { exportCSV } from '../csv';
+import {
+  type Tenant,
+  type User,
+  type Order,
+  defaultSettings,
+  settingsOf,
+} from '../types';
 const json = (
   data: unknown,
   status = 200,
@@ -76,6 +84,76 @@ async function stage<T>(name: string, work: Promise<T>) {
 }
 const cookie = (req: Request, value: string, age: number) =>
   `op_session=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${age}${new URL(req.url).protocol === 'https:' ? '; Secure' : ''}`;
+
+type UploadPayload = {
+  data: Uint8Array;
+  name: string;
+  type: 'image/jpeg' | 'image/png' | 'application/pdf';
+  size: number;
+};
+
+function safeName(input: string) {
+  let decoded = input || 'upload';
+  try {
+    decoded = decodeURIComponent(decoded);
+  } catch {}
+  return decoded.replace(/[^a-zA-Z0-9._ -]/g, '_').slice(0, 120) || 'upload';
+}
+
+function detectUploadType(data: Uint8Array) {
+  if (data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff)
+    return 'image/jpeg' as const;
+  if (data.slice(0, 8).join(',') === '137,80,78,71,13,10,26,10')
+    return 'image/png' as const;
+  if (new TextDecoder().decode(data.slice(0, 5)) === '%PDF-')
+    return 'application/pdf' as const;
+  return '';
+}
+
+function validateUpload(
+  data: Uint8Array,
+  name: string,
+  orderId: string | null,
+): UploadPayload {
+  if (!data.length) fail(400, 'Choose a file.');
+  if (data.length > 5 * 1024 * 1024) fail(413, 'File must be smaller than 5 MB.');
+  const detected = detectUploadType(data);
+  if (!detected || (!orderId && detected === 'application/pdf'))
+    fail(400, 'Use a PNG or JPEG image, or a PDF for an order.');
+  const type = detected as UploadPayload['type'];
+  return { data, name: safeName(name), type, size: data.length };
+}
+
+async function filePayload(file: File, orderId: string | null) {
+  return validateUpload(
+    new Uint8Array(await file.arrayBuffer()),
+    file.name,
+    orderId,
+  );
+}
+
+async function tenantCreateBody(req: Request) {
+  if (!req.headers.get('content-type')?.includes('multipart/form-data'))
+    return {
+      input: await body(req, tenantInput),
+      logo: null as UploadPayload | null,
+  };
+  const form = await req.formData();
+  const field = (key: string) => {
+    const value = form.get(key);
+    return typeof value === 'string' ? value : '';
+  };
+  const values = {
+    name: field('name'),
+    slug: field('slug'),
+    ownerName: field('ownerName'),
+    email: field('email'),
+    password: field('password'),
+  };
+  const rawLogo = form.get('logo');
+  const logo = rawLogo instanceof File && rawLogo.size ? await filePayload(rawLogo, null) : null;
+  return { input: tenantInput.parse(values), logo };
+}
 export async function handle(req: Request, env: Runtime): Promise<Response> {
   try {
     if (
@@ -122,7 +200,7 @@ export async function handle(req: Request, env: Runtime): Promise<Response> {
         { error: 'Starter supports up to two active employees.' },
         409,
       );
-    if (/UNIQUE constraint/.test(message))
+    if (/UNIQUE constraint|duplicate key value/.test(message))
       return json(
         { error: 'That email, SKU, slug or request already exists.' },
         409,
@@ -286,6 +364,19 @@ async function route(req: Request, env: Runtime): Promise<Response> {
         ),
       });
     }
+    if (p[2] === 'logo' && method === 'GET') {
+      const configuredLogo = settingsOf(tenant).branding?.logoId;
+      if (!configuredLogo) fail(404, 'Logo not found.');
+      const logoId = configuredLogo as string;
+      const file = await one<{ id: string }>(
+        db,
+        'SELECT id FROM files WHERE tenantId=? AND id=? AND orderId IS NULL',
+        tenant.id,
+        logoId,
+      );
+      if (!file) fail(404, 'Logo not found.');
+      return download(env, tenant.id, logoId, undefined, true);
+    }
     if (p[2] === 'orders' && method === 'POST') {
       await rateLimit(req, db, `checkout:${tenant.id}`, 20);
       return json(
@@ -427,19 +518,75 @@ async function route(req: Request, env: Runtime): Promise<Response> {
   }
   if (p[0] === 'admin') {
     requireRole(user, ['super_admin']);
-    if (p[1] === 'tenants' && method === 'GET')
+    if (p[1] === 'tenants' && method === 'GET') {
+      const q = (url.searchParams.get('q') || '').trim().toLowerCase().slice(0, 120);
+      const status = (url.searchParams.get('subscription') || '').trim();
+      const plan = (url.searchParams.get('plan') || '').trim().slice(0, 50);
+      const active = url.searchParams.get('active') || 'all';
+      const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit') || 25)));
+      const offset = Math.max(0, Number(url.searchParams.get('offset') || 0));
+      const where: string[] = [];
+      const args: unknown[] = [];
+      if (q) {
+        const needle = `%${q}%`;
+        where.push(
+          "(LOWER(t.name) LIKE ? OR LOWER(t.slug) LIKE ? OR LOWER(t.slug || '.inchouf.com') LIKE ? OR EXISTS (SELECT 1 FROM users u WHERE u.tenantId=t.id AND u.role='owner' AND LOWER(u.email) LIKE ?))",
+        );
+        args.push(needle, needle, needle, needle);
+      }
+      if (
+        ['trial', 'active', 'past_due', 'suspended', 'cancelled'].includes(
+          status,
+        )
+      ) {
+        where.push('t.subscription=?');
+        args.push(status);
+      }
+      if (plan) {
+        where.push('LOWER(t.plan)=?');
+        args.push(plan.toLowerCase());
+      }
+      if (active === 'enabled') where.push('t.active=1');
+      if (active === 'disabled') where.push('t.active=0');
+      const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+      const total = await one<{ count: number }>(
+        db,
+        `SELECT COUNT(*) AS count FROM tenants t ${whereSql}`,
+        ...args,
+      );
+      const summary = await one<{
+        activeCount: number;
+        suspendedCount: number;
+        monthlyValue: number;
+      }>(
+        db,
+        `SELECT SUM(CASE WHEN t.active=1 AND t.subscription!='suspended' THEN 1 ELSE 0 END) AS activeCount, SUM(CASE WHEN t.active=0 OR t.subscription='suspended' THEN 1 ELSE 0 END) AS suspendedCount, SUM(CASE WHEN t.active=1 AND t.subscription='active' THEN t.price ELSE 0 END) AS monthlyValue FROM tenants t ${whereSql}`,
+        ...args,
+      );
       return json({
         tenants: await rows(
           db,
-          'SELECT t.*, (SELECT COUNT(*) FROM orders o WHERE o.tenantId=t.id) AS orderCount, (SELECT COUNT(*) FROM users u WHERE u.tenantId=t.id AND u.active=1) AS userCount FROM tenants t ORDER BY createdAt DESC',
+          `SELECT t.*, (SELECT email FROM users u WHERE u.tenantId=t.id AND u.role='owner' ORDER BY createdAt LIMIT 1) AS ownerEmail, (SELECT COUNT(*) FROM orders o WHERE o.tenantId=t.id) AS orderCount, (SELECT COUNT(*) FROM users u WHERE u.tenantId=t.id AND u.active=1) AS userCount FROM tenants t ${whereSql} ORDER BY createdAt DESC LIMIT ? OFFSET ?`,
+          ...args,
+          limit,
+          offset,
         ),
+        total: Number(total?.count || 0),
+        summary: {
+          activeCount: Number(summary?.activeCount || 0),
+          suspendedCount: Number(summary?.suspendedCount || 0),
+          monthlyValue: Number(summary?.monthlyValue || 0),
+        },
+        limit,
+        offset,
         events: await rows(
           db,
           'SELECT * FROM platformEvents ORDER BY createdAt DESC LIMIT 50',
         ),
       });
+    }
     if (p[1] === 'tenants' && p.length === 2 && method === 'POST') {
-      const input = await body(req, tenantInput);
+      const { input, logo } = await tenantCreateBody(req);
       const id = uid();
       if (await one(db, 'SELECT id FROM tenants WHERE slug=?', input.slug))
         fail(409, 'That email, SKU, slug or request already exists.');
@@ -452,7 +599,24 @@ async function route(req: Request, env: Runtime): Promise<Response> {
         role: 'owner',
         tenantId: id,
       });
+      const logoId = logo ? uid() : '';
+      if (logo) {
+        try {
+          await env.FILES.put(`${id}/${logoId}`, logo.data, {
+            httpMetadata: { contentType: logo.type },
+          });
+        } catch (e) {
+          await auth(env)
+            .deleteUser(owner.id)
+            .catch(() => {});
+          throw e;
+        }
+      }
       try {
+        const settings = {
+          ...defaultSettings,
+          branding: logoId ? { logoId } : undefined,
+        };
         await db.batch([
           stmt(
             db,
@@ -462,9 +626,24 @@ async function route(req: Request, env: Runtime): Promise<Response> {
             input.slug,
             now(),
             new Date(Date.now() + 14 * 86400000).toISOString(),
-            JSON.stringify(defaultSettings),
+            JSON.stringify(settings),
             now(),
           ),
+          ...(logo
+            ? [
+                stmt(
+                  db,
+                  'INSERT INTO files (id,tenantId,orderId,name,type,size,createdAt) VALUES (?,?,?,?,?,?,?)',
+                  logoId,
+                  id,
+                  null,
+                  logo.name,
+                  logo.type,
+                  logo.size,
+                  now(),
+                ),
+              ]
+            : []),
           stmt(
             db,
             'INSERT INTO users (id,tenantId,email,name,role,createdAt) VALUES (?,?,?,?,?,?)',
@@ -478,6 +657,8 @@ async function route(req: Request, env: Runtime): Promise<Response> {
           platformEvent(db, user.name, 'Business created', input.slug),
         ]);
       } catch (e) {
+        if (logoId)
+          await env.FILES.delete(`${id}/${logoId}`).catch(() => {});
         await auth(env)
           .deleteUser(owner.id)
           .catch(() => {});
@@ -573,6 +754,46 @@ async function route(req: Request, env: Runtime): Promise<Response> {
           `SELECT * FROM orders WHERE ${where} ORDER BY createdAt DESC LIMIT 500`,
           ...args,
         ),
+      );
+    }
+    if (method === 'GET' && p[1] === 'export') {
+      requireRole(user, ['owner', 'order_manager']);
+      const exported = await rows<Order>(
+        db,
+        'SELECT reference,customer,phone,status,payment,total,address,createdAt FROM orders WHERE tenantId=? ORDER BY createdAt DESC LIMIT 5000',
+        t,
+      );
+      return new Response(
+        exportCSV([
+          [
+            'Reference',
+            'Customer',
+            'Phone',
+            'Status',
+            'Payment',
+            'Total USD',
+            'Address',
+            'Created at',
+          ],
+          ...exported.map((o) => [
+            o.reference,
+            o.customer,
+            o.phone,
+            o.status,
+            o.payment,
+            (o.total / 100).toFixed(2),
+            o.address,
+            o.createdAt,
+          ]),
+        ]),
+        {
+          headers: {
+            'Content-Type': 'text/csv;charset=utf-8',
+            'Content-Disposition': 'attachment; filename="orders.csv"',
+            'Cache-Control': 'no-store',
+            'X-Content-Type-Options': 'nosniff',
+          },
+        },
       );
     }
     if (method === 'POST' && p.length === 1) {
@@ -760,11 +981,18 @@ async function route(req: Request, env: Runtime): Promise<Response> {
   }
   if (p[0] === 'catalog' && method === 'GET') {
     allow(user, 'orders');
+    const q = (url.searchParams.get('q') || '').trim().toLowerCase().slice(0, 120);
+    const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit') || 50)));
+    const productWhere = q
+      ? 'tenantId=? AND active=1 AND (LOWER(name) LIKE ? OR LOWER(sku) LIKE ?)'
+      : 'tenantId=? AND active=1';
+    const productArgs = q ? [t, `%${q}%`, `%${q}%`] : [t];
     return json({
       products: await rows(
         db,
-        'SELECT * FROM products WHERE tenantId=? AND active=1',
-        t,
+        `SELECT * FROM products WHERE ${productWhere} ORDER BY name LIMIT ?`,
+        ...productArgs,
+        limit,
       ),
       zones: await rows(
         db,
@@ -927,11 +1155,13 @@ async function route(req: Request, env: Runtime): Promise<Response> {
     allow(user, 'settings');
     if (method === 'PATCH') {
       const i = await body(req, settingsInput);
+      const tenant = await one<Tenant>(db, 'SELECT * FROM tenants WHERE id=?', t);
+      const branding = tenant ? settingsOf(tenant).branding : undefined;
       await db.batch([
         stmt(
           db,
           'UPDATE tenants SET settings=? WHERE id=?',
-          JSON.stringify(i),
+          JSON.stringify({ ...i, branding }),
           t,
         ),
         event(db, t, user.name, 'Storefront settings updated'),
@@ -941,13 +1171,159 @@ async function route(req: Request, env: Runtime): Promise<Response> {
   }
   if (p[0] === 'customers' && method === 'GET') {
     allow(user, 'customers');
+    const q = (url.searchParams.get('q') || '').trim().toLowerCase().slice(0, 120);
+    if (p[1]) {
+      const phone = decodeURIComponent(p[1]);
+      const summary = await one<{
+        phone: string;
+        name: string;
+        email: string;
+        orders: number;
+        deliveredOrders: number;
+        revenue: number;
+        outstanding: number;
+        lastOrder: string;
+      }>(
+        db,
+        "SELECT phone,MAX(customer) name,MAX(email) email,COUNT(*) orders,SUM(CASE WHEN status='Delivered' THEN 1 ELSE 0 END) deliveredOrders,SUM(CASE WHEN status='Delivered' THEN total ELSE 0 END) revenue,SUM(CASE WHEN payment!='Paid' AND status NOT IN ('Cancelled','Returned','Failed Delivery') THEN total-cashCollected ELSE 0 END) outstanding,MAX(createdAt) lastOrder FROM orders WHERE tenantId=? AND phone=? GROUP BY phone",
+        t,
+        phone,
+      );
+      if (!summary) fail(404, 'Customer not found.');
+      return json({
+        customer: summary,
+        orders: await rows(
+          db,
+          'SELECT id,reference,status,payment,total,cashCollected,createdAt FROM orders WHERE tenantId=? AND phone=? ORDER BY createdAt DESC LIMIT 100',
+          t,
+          phone,
+        ),
+      });
+    }
+    const where = q
+      ? "tenantId=? AND (LOWER(customer) LIKE ? OR LOWER(phone) LIKE ? OR LOWER(email) LIKE ?)"
+      : 'tenantId=?';
+    const args = q ? [t, `%${q}%`, `%${q}%`, `%${q}%`] : [t];
     return json(
       await rows(
         db,
-        "SELECT phone,MAX(customer) name,MAX(email) email,COUNT(*) orders,SUM(CASE WHEN status='Delivered' THEN total ELSE 0 END) revenue,MAX(createdAt) lastOrder FROM orders WHERE tenantId=? GROUP BY phone ORDER BY lastOrder DESC",
-        t,
+        `SELECT phone,MAX(customer) name,MAX(email) email,COUNT(*) orders,SUM(CASE WHEN status='Delivered' THEN total ELSE 0 END) revenue,SUM(CASE WHEN payment!='Paid' AND status NOT IN ('Cancelled','Returned','Failed Delivery') THEN total-cashCollected ELSE 0 END) outstanding,MAX(createdAt) lastOrder FROM orders WHERE ${where} GROUP BY phone ORDER BY lastOrder DESC LIMIT 100`,
+        ...args,
       ),
     );
+  }
+  if (p[0] === 'settlements') {
+    requireRole(user, ['owner']);
+    if (method === 'GET') {
+      return json({
+        settlements: await rows(
+          db,
+          'SELECT * FROM settlements WHERE tenantId=? ORDER BY createdAt DESC LIMIT 100',
+          t,
+        ),
+        orders: await rows(
+          db,
+          'SELECT so.settlementId,so.amount,o.reference,o.customer,o.status,o.payment FROM settlementorders so JOIN orders o ON o.tenantId=so.tenantId AND o.id=so.orderId WHERE so.tenantId=? ORDER BY o.createdAt DESC LIMIT 500',
+          t,
+        ),
+      });
+    }
+    if (method === 'POST') {
+      const input = await body(req, settlementInput);
+      if (input.method === 'internal_driver' && !input.driverId)
+        fail(400, 'Choose a driver to reconcile.');
+      if (input.method === 'external_courier' && !input.provider?.trim())
+        fail(400, 'Enter the external courier name.');
+      if (input.driverId) {
+        const driver = await one<User>(
+          db,
+          'SELECT id,role FROM users WHERE tenantId=? AND id=? AND active=1',
+          t,
+          input.driverId,
+        );
+        if (!driver || !['owner', 'delivery_manager'].includes(driver.role))
+          fail(400, 'Choose an active delivery employee.');
+      }
+      const filters = [
+        'o.tenantId=?',
+        "o.status='Delivered'",
+        "o.paymentMethod='Cash on delivery'",
+        "o.payment!='Refunded'",
+        'so.id IS NULL',
+        'o.createdAt >= COALESCE(?, o.createdAt)',
+        'o.createdAt <= COALESCE(?, o.createdAt)',
+      ];
+      const args: unknown[] = [t, input.periodStart ?? null, input.periodEnd ?? null];
+      if (input.method === 'internal_driver') {
+        filters.push('o.deliveryMethod=?', 'o.driverId=?');
+        args.push(input.method, input.driverId);
+      } else {
+        filters.push('o.deliveryMethod=?', 'LOWER(o.deliveryProvider)=LOWER(?)');
+        args.push(input.method, input.provider || '');
+      }
+      const eligible = await rows<{ id: string; total: number }>(
+        db,
+        `SELECT o.id,o.total FROM orders o LEFT JOIN settlementorders so ON so.tenantId=o.tenantId AND so.orderId=o.id WHERE ${filters.join(' AND ')} ORDER BY o.createdAt`,
+        ...args,
+      );
+      if (!eligible.length) fail(409, 'No unsettled delivered COD orders match.');
+      const expected = eligible.reduce((sum, order) => sum + order.total, 0);
+      const variance = input.actual - expected;
+      const settlementId = uid();
+      const status = variance === 0 ? 'balanced' : variance < 0 ? 'missing' : 'extra';
+      await db.batch([
+        stmt(
+          db,
+          'INSERT INTO settlements (id,tenantId,method,driverId,provider,periodStart,periodEnd,expected,actual,variance,status,createdBy,createdAt) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
+          settlementId,
+          t,
+          input.method,
+          input.driverId ?? null,
+          input.provider || '',
+          input.periodStart ?? null,
+          input.periodEnd ?? null,
+          expected,
+          input.actual,
+          variance,
+          status,
+          user.id,
+          now(),
+        ),
+        ...eligible.map((order) =>
+          stmt(
+            db,
+            'INSERT INTO settlementorders (id,tenantId,settlementId,orderId,amount) VALUES (?,?,?,?,?)',
+            uid(),
+            t,
+            settlementId,
+            order.id,
+            order.total,
+          ),
+        ),
+        ...(input.actual >= expected
+          ? eligible.map((order) =>
+              stmt(
+                db,
+                'UPDATE orders SET payment=?,cashCollected=?,updatedAt=? WHERE tenantId=? AND id=?',
+                'Paid',
+                order.total,
+                now(),
+                t,
+                order.id,
+              ),
+            )
+          : []),
+        event(
+          db,
+          t,
+          user.name,
+          'Cash settlement created',
+          null,
+          `Expected ${(expected / 100).toFixed(2)} / Returned ${(input.actual / 100).toFixed(2)} / ${status}`,
+        ),
+      ]);
+      return json({ id: settlementId, expected, actual: input.actual, variance, status }, 201);
+    }
   }
   if (p[0] === 'waiting-proofs' && method === 'GET') {
     allow(user, 'orders');
@@ -1021,22 +1397,15 @@ async function upload(
     data.set(chunk, offset);
     offset += chunk.length;
   }
-  let type = '';
-  if (data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff)
-    type = 'image/jpeg';
-  if (data.slice(0, 8).join(',') === '137,80,78,71,13,10,26,10')
-    type = 'image/png';
-  if (new TextDecoder().decode(data.slice(0, 5)) === '%PDF-')
-    type = 'application/pdf';
-  if (!type || (!orderId && type === 'application/pdf'))
-    fail(400, 'Use a PNG or JPEG image, or a PDF for an order.');
+  const upload = validateUpload(
+    data,
+    req.headers.get('x-file-name') || 'upload',
+    orderId,
+  );
   const id = uid();
-  const name = (req.headers.get('x-file-name') || 'upload')
-    .replace(/[^a-zA-Z0-9._ -]/g, '_')
-    .slice(0, 120);
   const db = database(env);
-  await env.FILES.put(`${tenantId}/${id}`, data, {
-    httpMetadata: { contentType: type },
+  await env.FILES.put(`${tenantId}/${id}`, upload.data, {
+    httpMetadata: { contentType: upload.type },
   });
   try {
     await db.batch([
@@ -1046,18 +1415,18 @@ async function upload(
         id,
         tenantId,
         orderId,
-        name,
-        type,
-        size,
+        upload.name,
+        upload.type,
+        upload.size,
         now(),
       ),
-      event(db, tenantId, actor, 'File uploaded', orderId, name),
+      event(db, tenantId, actor, 'File uploaded', orderId, upload.name),
     ]);
   } catch (e) {
     await env.FILES.delete(`${tenantId}/${id}`);
     throw e;
   }
-  return json({ id, name, type, size }, 201);
+  return json({ id, name: upload.name, type: upload.type, size: upload.size }, 201);
 }
 async function download(
   env: Runtime,

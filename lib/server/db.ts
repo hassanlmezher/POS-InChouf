@@ -44,6 +44,8 @@ const keyMap: Record<string, string> = {
   paymentmethod: 'paymentMethod',
   deliveryfee: 'deliveryFee',
   deliverystatus: 'deliveryStatus',
+  deliverymethod: 'deliveryMethod',
+  deliveryprovider: 'deliveryProvider',
   cashcollected: 'cashCollected',
   trackinghash: 'trackingHash',
   trialstart: 'trialStart',
@@ -56,6 +58,14 @@ const keyMap: Record<string, string> = {
   ordercount: 'orderCount',
   usercount: 'userCount',
   lastorder: 'lastOrder',
+  owneremail: 'ownerEmail',
+  activecount: 'activeCount',
+  suspendedcount: 'suspendedCount',
+  monthlyvalue: 'monthlyValue',
+  periodstart: 'periodStart',
+  periodend: 'periodEnd',
+  createdby: 'createdBy',
+  settlementid: 'settlementId',
 };
 
 export const now = () => new Date().toISOString();

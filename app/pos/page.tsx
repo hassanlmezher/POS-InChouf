@@ -49,6 +49,7 @@ import {
   Modal,
   ProductImage,
   Choice,
+  Submit,
 } from '@/components/shared';
 import ProductEditor from '@/components/product-editor';
 import OrderDetail from '@/components/order-detail';
@@ -64,12 +65,45 @@ import {
   type Zone,
   type Permission,
   type Event,
+  type Settlement,
   rolePermissions,
   roleLabels,
   statuses,
   money,
   settingsOf,
 } from '@/lib/types';
+
+type CustomerSummary = {
+  phone: string;
+  name: string;
+  email: string;
+  orders: number;
+  revenue: number;
+  outstanding: number;
+  lastOrder: string;
+};
+
+type CustomerProfile = {
+  customer: CustomerSummary & { deliveredOrders: number };
+  orders: {
+    id: string;
+    reference: string;
+    status: string;
+    payment: string;
+    total: number;
+    cashCollected: number;
+    createdAt: string;
+  }[];
+};
+
+type SettlementOrder = {
+  settlementId: string;
+  amount: number;
+  reference: string;
+  customer: string;
+  status: string;
+  payment: string;
+};
 type View =
   | 'Overview'
   | 'Orders'
@@ -140,7 +174,9 @@ export default function Pos() {
   const [view, setView] = useState<View>('Overview'),
     [filter, setFilter] = useState('All orders'),
     [search, setSearch] = useState(''),
+    [debouncedSearch, setDebouncedSearch] = useState(''),
     [selected, setSelected] = useState<string | null>(null),
+    [selectedCustomer, setSelectedCustomer] = useState<string | null>(null),
     [editing, setEditing] = useState<Product | null | undefined>(undefined),
     [manual, setManual] = useState(false),
     [error, setError] = useState('');
@@ -149,25 +185,41 @@ export default function Pos() {
   const perms = user ? rolePermissions[user.role] : [];
   const orders = useResource<Order[]>(
       user && perms.includes('orders') ? 'orders' : null,
+      { intervalMs: 15000 },
     ),
     products = useResource<Product[]>(
       user && perms.includes('products') ? 'products' : null,
+      { intervalMs: 30000 },
     );
-  const audit = useResource<Event[]>(view === 'Audit log' ? 'audit' : null);
-  const customers = useResource<
-    {
-      phone: string;
-      name: string;
-      email: string;
-      orders: number;
-      revenue: number;
-      lastOrder: string;
-    }[]
-  >(view === 'Customers' ? 'customers' : null);
+  const audit = useResource<Event[]>(view === 'Audit log' ? 'audit' : null, {
+    intervalMs: 30000,
+  });
+  const customers = useResource<CustomerSummary[]>(
+    view === 'Customers'
+      ? `customers${debouncedSearch ? `?q=${encodeURIComponent(debouncedSearch)}` : ''}`
+      : null,
+    { intervalMs: 30000 },
+  );
+  const customerProfile = useResource<CustomerProfile>(
+    selectedCustomer ? `customers/${encodeURIComponent(selectedCustomer)}` : null,
+    { intervalMs: 30000 },
+  );
   const proofQueue = useResource<{ orderId: string }[]>(
     user && perms.includes('orders') ? 'waiting-proofs' : null,
+    { intervalMs: 15000 },
+  );
+  const settlements = useResource<{
+    settlements: Settlement[];
+    orders: SettlementOrder[];
+  }>(
+    view === 'Delivery' && user?.role === 'owner' ? 'settlements' : null,
+    { intervalMs: 30000 },
   );
   const csvRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 250);
+    return () => window.clearTimeout(timer);
+  }, [search]);
   useEffect(() => {
     if (user?.role === 'super_admin') location.href = '/admin';
     if (user?.role === 'assistant') setView('Products');
@@ -209,6 +261,31 @@ export default function Pos() {
     (o) => new Date(o.createdAt).toDateString() === new Date().toDateString(),
   );
   const delivered = all.filter((o) => o.status === 'Delivered');
+  const deliveredValue = delivered.reduce((s, o) => s + o.total, 0);
+  const paidRevenue = all
+    .filter((o) => o.payment === 'Paid')
+    .reduce((s, o) => s + o.total, 0);
+  const outstanding = all
+    .filter(
+      (o) =>
+        o.payment !== 'Paid' &&
+        !['Cancelled', 'Returned', 'Failed Delivery'].includes(o.status),
+    )
+    .reduce((s, o) => s + Math.max(0, o.total - o.cashCollected), 0);
+  const cashCollected = all.reduce((s, o) => s + o.cashCollected, 0);
+  const codExpected = all
+    .filter(
+      (o) =>
+        o.paymentMethod === 'Cash on delivery' &&
+        !['Cancelled', 'Returned', 'Failed Delivery'].includes(o.status),
+    )
+    .reduce((s, o) => s + Math.max(0, o.total - o.cashCollected), 0);
+  const refunds = all
+    .filter((o) => o.payment === 'Refunded')
+    .reduce((s, o) => s + o.total, 0);
+  const tenantLogo = settingsOf(tenant).branding?.logoId
+    ? `/api/store/${tenant.slug}/logo`
+    : '';
   const metrics = [
     [
       'New orders',
@@ -229,13 +306,13 @@ export default function Pos() {
       'On the way to customers',
     ],
     [
-      'Today’s sales',
+      'Delivered value today',
       money(
         today
           .filter((o) => o.status === 'Delivered')
           .reduce((s, o) => s + o.total, 0),
       ),
-      'Delivered orders placed today',
+      'Order value, not collected cash',
     ],
   ];
   const go = (v: View) => {
@@ -248,7 +325,14 @@ export default function Pos() {
     <SidebarProvider className="dashboard-shell">
       <Sidebar className="app-sidebar">
         <SidebarHeader className="sidebar-brand">
-          <Brand />
+          {tenantLogo ? (
+            <a className="brand tenant-app-brand" href="/pos">
+              <img src={tenantLogo} alt={`${tenant.name} logo`} />
+              <span>{tenant.name}</span>
+            </a>
+          ) : (
+            <Brand />
+          )}
         </SidebarHeader>
         <div className="sidebar-store">
           <strong>{tenant.name}</strong>
@@ -437,17 +521,7 @@ export default function Pos() {
                       <span>Pending cash on delivery</span>
                       <strong>
                         {money(
-                          all
-                            .filter(
-                              (o) =>
-                                o.paymentMethod === 'Cash on delivery' &&
-                                !['Cancelled', 'Returned'].includes(o.status),
-                            )
-                            .reduce(
-                              (s, o) =>
-                                s + Math.max(0, o.total - o.cashCollected),
-                              0,
-                            ),
+                          codExpected,
                         )}
                       </strong>
                       <small>Order total less recorded cash collected</small>
@@ -473,34 +547,12 @@ export default function Pos() {
                   </p>
                 </div>
                 <div className="inline-actions">
-                  <button
-                    className="button secondary"
-                    onClick={() =>
-                      downloadCSV('orders.csv', [
-                        [
-                          'Reference',
-                          'Customer',
-                          'Phone',
-                          'Status',
-                          'Payment',
-                          'Total USD',
-                          'Address',
-                        ],
-                        ...visible.map((o) => [
-                          o.reference,
-                          o.customer,
-                          o.phone,
-                          o.status,
-                          o.payment,
-                          (o.total / 100).toFixed(2),
-                          o.address,
-                        ]),
-                      ])
-                    }
-                  >
-                    <Download size={16} />
-                    Export
-                  </button>
+                  {['owner', 'order_manager'].includes(user.role) && (
+                    <a className="button secondary" href="/api/orders/export">
+                      <Download size={16} />
+                      Export
+                    </a>
+                  )}
                   {['owner', 'order_manager'].includes(user.role) && (
                     <button className="button" onClick={() => setManual(true)}>
                       <Plus size={16} />
@@ -541,6 +593,16 @@ export default function Pos() {
               <div className="panel">
                 <OrderTable orders={visible} select={setSelected} />
               </div>
+              {view === 'Delivery' && user.role === 'owner' && (
+                <SettlementPanel
+                  data={settlements.data}
+                  error={settlements.error}
+                  refresh={async () => {
+                    await settlements.refresh();
+                    refresh();
+                  }}
+                />
+              )}
             </>
           )}
           {view === 'Work queues' && (
@@ -771,6 +833,19 @@ export default function Pos() {
                 </div>
               </div>
               <ErrorBox error={customers.error} />
+              <div className="table-toolbar">
+                <div className="search-wrap">
+                  <Search />
+                  <input
+                    className="search-input"
+                    placeholder="Search name, phone or email"
+                    aria-label="Search customers"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </div>
+                <small>{customers.data?.length || 0} customers</small>
+              </div>
               <div className="panel">
                 <Table className="op-table">
                   <TableHeader>
@@ -779,7 +854,8 @@ export default function Pos() {
                         'Customer',
                         'Contact',
                         'Orders',
-                        'Delivered sales',
+                        'Delivered value',
+                        'Outstanding',
                         'Last order',
                       ].map((h) => (
                         <TableHead key={h}>{h}</TableHead>
@@ -792,10 +868,7 @@ export default function Pos() {
                         <TableCell>
                           <button
                             className="row-link"
-                            onClick={() => {
-                              go('Orders');
-                              setSearch(c.phone);
-                            }}
+                            onClick={() => setSelectedCustomer(c.phone)}
                           >
                             {c.name}
                           </button>
@@ -806,6 +879,7 @@ export default function Pos() {
                         </TableCell>
                         <TableCell>{c.orders}</TableCell>
                         <TableCell>{money(c.revenue)}</TableCell>
+                        <TableCell>{money(c.outstanding)}</TableCell>
                         <TableCell>
                           {new Date(c.lastOrder).toLocaleDateString()}
                         </TableCell>
@@ -833,15 +907,17 @@ export default function Pos() {
               <div className="metric-grid">
                 {[
                   [
-                    'Delivered sales',
-                    money(delivered.reduce((s, o) => s + o.total, 0)),
+                    'Delivered order value',
+                    money(deliveredValue),
                   ],
+                  ['Paid revenue', money(paidRevenue)],
+                  ['Outstanding amount', money(outstanding)],
+                  ['Cash recorded', money(cashCollected)],
                   [
                     'Average delivered order',
                     money(
                       delivered.length
-                        ? delivered.reduce((s, o) => s + o.total, 0) /
-                            delivered.length
+                        ? deliveredValue / delivered.length
                         : 0,
                     ),
                   ],
@@ -852,6 +928,7 @@ export default function Pos() {
                       ['Returned', 'Failed Delivery'].includes(o.status),
                     ).length,
                   ],
+                  ['Refunds', money(refunds)],
                 ].map(([a, b]) => (
                   <div className="metric" key={a}>
                     <span>{a}</span>
@@ -943,6 +1020,86 @@ export default function Pos() {
           onSaved={refresh}
         />
       )}
+      {selectedCustomer && (
+        <Modal
+          open
+          title="Customer profile"
+          description="Order history grouped by phone number."
+          onClose={() => setSelectedCustomer(null)}
+        >
+          {customerProfile.loading ? (
+            <Loading />
+          ) : (
+            <div className="form-stack">
+              <ErrorBox
+                error={customerProfile.error}
+                retry={customerProfile.refresh}
+              />
+              {customerProfile.data && (
+                <>
+                  <div className="detail-grid">
+                    <div>
+                      <small>Name</small>
+                      <strong>{customerProfile.data.customer.name}</strong>
+                      <p>{customerProfile.data.customer.phone}</p>
+                      <p>{customerProfile.data.customer.email}</p>
+                    </div>
+                    <div>
+                      <small>History</small>
+                      <p>{customerProfile.data.customer.orders} orders</p>
+                      <p>
+                        {customerProfile.data.customer.deliveredOrders}{' '}
+                        delivered
+                      </p>
+                      <p>
+                        Outstanding{' '}
+                        {money(customerProfile.data.customer.outstanding)}
+                      </p>
+                    </div>
+                  </div>
+                  <Table className="op-table">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Order</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Payment</TableHead>
+                        <TableHead>Total</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {customerProfile.data.orders.map((o) => (
+                        <TableRow key={o.id}>
+                          <TableCell>
+                            <button
+                              className="row-link"
+                              onClick={() => {
+                                setSelectedCustomer(null);
+                                setSelected(o.id);
+                              }}
+                            >
+                              {o.reference}
+                            </button>
+                            <small>
+                              {new Date(o.createdAt).toLocaleDateString()}
+                            </small>
+                          </TableCell>
+                          <TableCell>
+                            <StatusBadge value={o.status} />
+                          </TableCell>
+                          <TableCell>
+                            <StatusBadge value={o.payment} />
+                          </TableCell>
+                          <TableCell>{money(o.total)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </>
+              )}
+            </div>
+          )}
+        </Modal>
+      )}
     </SidebarProvider>
   );
 }
@@ -1001,6 +1158,189 @@ function OrderTable({
     </Table>
   );
 }
+
+function SettlementPanel({
+  data,
+  error,
+  refresh,
+}: {
+  data: { settlements: Settlement[]; orders: SettlementOrder[] } | null;
+  error: string;
+  refresh: () => Promise<void>;
+}) {
+  const team = useResource<User[]>('team', { intervalMs: 30000 });
+  const [method, setMethod] = useState<'internal_driver' | 'external_courier'>(
+      'internal_driver',
+    ),
+    [driverId, setDriverId] = useState('none'),
+    [provider, setProvider] = useState(''),
+    [periodStart, setPeriodStart] = useState(''),
+    [periodEnd, setPeriodEnd] = useState(''),
+    [actual, setActual] = useState(''),
+    [busy, setBusy] = useState(false),
+    [localError, setLocalError] = useState(''),
+    [success, setSuccess] = useState('');
+  const drivers =
+    team.data?.filter((u) => ['owner', 'delivery_manager'].includes(u.role)) ||
+    [];
+  const toIso = (date: string, end = false) =>
+    date
+      ? new Date(`${date}T${end ? '23:59:59.999' : '00:00:00.000'}`).toISOString()
+      : null;
+  return (
+    <div className="panel">
+      <div className="panel-head">
+        <div>
+          <h3>Cash reconciliation</h3>
+          <small>Settle delivered COD orders by driver or courier batch.</small>
+        </div>
+      </div>
+      <div className="panel-body form-stack">
+        <ErrorBox error={error || team.error || localError} />
+        {success && <div className="success-box">{success}</div>}
+        <form
+          className="form-stack"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setBusy(true);
+            setLocalError('');
+            setSuccess('');
+            try {
+              const result = await api<{
+                expected: number;
+                actual: number;
+                variance: number;
+                status: string;
+              }>('settlements', 'POST', {
+                method,
+                driverId: method === 'internal_driver' ? driverId : null,
+                provider: method === 'external_courier' ? provider : '',
+                periodStart: toIso(periodStart),
+                periodEnd: toIso(periodEnd, true),
+                actual: Math.round(Number(actual) * 100),
+              });
+              setActual('');
+              setSuccess(
+                `Expected ${money(result.expected)} / Actual ${money(result.actual)} / Difference ${money(result.variance)} (${result.status}).`,
+              );
+              await refresh();
+            } catch (e) {
+              setLocalError(message(e));
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          <div className="form-grid">
+            <Choice
+              label="Settlement type"
+              value={method}
+              onChange={(v) =>
+                setMethod(v as 'internal_driver' | 'external_courier')
+              }
+              options={[
+                { value: 'internal_driver', label: 'Internal driver' },
+                { value: 'external_courier', label: 'External courier' },
+              ]}
+            />
+            {method === 'internal_driver' ? (
+              <Choice
+                label="Driver"
+                value={driverId}
+                onChange={setDriverId}
+                options={[
+                  { value: 'none', label: 'Choose driver' },
+                  ...drivers.map((u) => ({ value: u.id, label: u.name })),
+                ]}
+              />
+            ) : (
+              <Field label="Courier company">
+                <input
+                  value={provider}
+                  maxLength={120}
+                  onChange={(e) => setProvider(e.target.value)}
+                  required
+                />
+              </Field>
+            )}
+            <Field label="Period start">
+              <input
+                type="date"
+                value={periodStart}
+                onChange={(e) => setPeriodStart(e.target.value)}
+              />
+            </Field>
+            <Field label="Period end">
+              <input
+                type="date"
+                value={periodEnd}
+                onChange={(e) => setPeriodEnd(e.target.value)}
+              />
+            </Field>
+            <Field label="Actual returned ($)">
+              <input
+                type="number"
+                min="0"
+                step=".01"
+                value={actual}
+                onChange={(e) => setActual(e.target.value)}
+                required
+              />
+            </Field>
+          </div>
+          <Submit
+            busy={busy}
+            disabled={
+              actual === '' ||
+              (method === 'internal_driver' && driverId === 'none') ||
+              (method === 'external_courier' && !provider.trim())
+            }
+          >
+            Create settlement
+          </Submit>
+        </form>
+        {data?.settlements.length ? (
+          <div className="activity-list">
+            {data.settlements.map((settlement) => {
+              const lines = data.orders.filter(
+                (o) => o.settlementId === settlement.id,
+              );
+              return (
+                <div className="activity-item" key={settlement.id}>
+                  <strong>
+                    {settlement.method === 'external_courier'
+                      ? settlement.provider
+                      : drivers.find((d) => d.id === settlement.driverId)
+                          ?.name || 'Internal driver'}
+                  </strong>
+                  <p>
+                    Expected {money(settlement.expected)} / Actual{' '}
+                    {money(settlement.actual)} / Difference{' '}
+                    {money(settlement.variance)} ({settlement.status})
+                  </p>
+                  <small>{new Date(settlement.createdAt).toLocaleString()}</small>
+                  <div className="settlement-orders">
+                    {lines.map((line) => (
+                      <span key={line.reference}>
+                        {line.reference} · {line.customer} · {money(line.amount)}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <EmptyState
+            title="No settlements yet"
+            description="Completed COD delivery batches will be recorded here."
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
 function downloadCSV(filename: string, rows: (string | number | boolean | null | undefined)[][]) {
   const url = URL.createObjectURL(
     new Blob([exportCSV(rows)], { type: 'text/csv;charset=utf-8' }),
@@ -1020,12 +1360,30 @@ function ManualOrder({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const r = useResource<{ products: Product[]; zones: Zone[] }>('catalog');
+  const [productSearch, setProductSearch] = useState(''),
+    [debouncedProductSearch, setDebouncedProductSearch] = useState(''),
+    [selectedProducts, setSelectedProducts] = useState<Product[]>([]);
+  useEffect(() => {
+    const timer = window.setTimeout(
+      () => setDebouncedProductSearch(productSearch.trim()),
+      250,
+    );
+    return () => window.clearTimeout(timer);
+  }, [productSearch]);
+  const r = useResource<{ products: Product[]; zones: Zone[] }>(
+    `catalog?limit=50${debouncedProductSearch ? `&q=${encodeURIComponent(debouncedProductSearch)}` : ''}`,
+  );
   const [lines, setLines] = useState<CartLine[]>([]),
     [done, setDone] = useState<{
       trackingUrl: string;
       reference: string;
     } | null>(null);
+  const products = [
+    ...selectedProducts,
+    ...(r.data?.products || []).filter(
+      (p) => !selectedProducts.some((selected) => selected.id === p.id),
+    ),
+  ];
   return (
     <Modal
       open
@@ -1052,32 +1410,52 @@ function ManualOrder({
         </div>
       ) : r.data ? (
         <div className="form-stack">
-          <Choice
-            label="Add product"
-            value="none"
-            onChange={(v) => {
-              const p = r.data!.products.find((p) => p.id === v);
-              if (p)
-                setLines([
-                  ...lines,
-                  {
-                    productId: v,
-                    quantity: 1,
-                    variant: JSON.parse(p.variants)[0]?.name || '',
-                    custom: {},
-                  },
-                ]);
-            }}
-            options={[
-              { value: 'none', label: 'Select a product' },
-              ...r.data.products.map((p) => ({
-                value: p.id,
-                label: `${p.name} · ${money(p.price)}`,
-              })),
-            ]}
-          />
+          <div className="search-wrap">
+            <Search />
+            <input
+              className="search-input"
+              placeholder="Search product name or SKU"
+              aria-label="Search products for order"
+              value={productSearch}
+              onChange={(e) => setProductSearch(e.target.value)}
+            />
+          </div>
+          <div className="manual-product-results">
+            {r.data.products.map((p) => (
+              <button
+                className="manual-product"
+                key={p.id}
+                disabled={p.stock <= 0}
+                onClick={() => {
+                  setSelectedProducts((existing) =>
+                    existing.some((item) => item.id === p.id)
+                      ? existing
+                      : [...existing, p],
+                  );
+                  setLines([
+                    ...lines,
+                    {
+                      productId: p.id,
+                      quantity: 1,
+                      variant: JSON.parse(p.variants)[0]?.name || '',
+                      custom: {},
+                    },
+                  ]);
+                }}
+              >
+                <ProductImage src={p.image} name={p.name} />
+                <span>
+                  <strong>{p.name}</strong>
+                  <small>
+                    {p.sku} · {money(p.price)} · {p.stock} available
+                  </small>
+                </span>
+              </button>
+            ))}
+          </div>
           {lines.map((l, i) => {
-            const p = r.data!.products.find((p) => p.id === l.productId)!;
+            const p = products.find((p) => p.id === l.productId)!;
+            const max = Math.min(p.stock, 100);
             return (
               <div className="note-block form-stack" key={i}>
                 <strong>{p.name}</strong>
@@ -1085,17 +1463,26 @@ function ManualOrder({
                   <input
                     type="number"
                     min={1}
-                    max={100}
+                    max={max}
                     value={l.quantity}
                     onChange={(e) =>
                       setLines(
                         lines.map((x, n) =>
-                          n === i ? { ...x, quantity: +e.target.value } : x,
+                          n === i
+                            ? {
+                                ...x,
+                                quantity: Math.min(
+                                  Math.max(1, Number(e.target.value)),
+                                  max || 1,
+                                ),
+                              }
+                            : x,
                         ),
                       )
                     }
                   />
                 </Field>
+                <small>Only {max} units available.</small>
                 {JSON.parse(p.variants).length > 0 && (
                   <Choice
                     label="Variant"
@@ -1147,7 +1534,7 @@ function ManualOrder({
             );
           })}
           <Checkout
-            products={r.data.products}
+            products={products}
             zones={r.data.zones}
             settings={settingsOf(tenant)}
             lines={lines}

@@ -193,13 +193,15 @@ export function StatusBadge({ value }: { value: string }) {
 }
 export function Submit({
   busy,
+  disabled = false,
   children = 'Save changes',
 }: {
   busy: boolean;
+  disabled?: boolean;
   children?: ReactNode;
 }) {
   return (
-    <button type="submit" className="button" disabled={busy}>
+    <button type="submit" className="button" disabled={busy || disabled}>
       {busy && <Loader2 size={16} className="animate-spin" />}
       {busy ? 'Saving…' : children}
     </button>

@@ -32,15 +32,16 @@ The local bootstrap email defaults to `admin@demo.inchouf.test`, and its random 
 
 ## Features
 
-- Active/suspended businesses, manual subscriptions and owner access resets.
+- Searchable active/suspended businesses, tenant logo branding, manual subscriptions and owner access resets.
 - Independent password sessions and server-side employee role enforcement.
 - Catalog, categories, pooled stock, variants, custom text and private file uploads.
-- Searchable storefront, cart, account-free checkout, manual orders and COD/manual payment records.
+- Searchable storefront, cart, account-free checkout, bounded manual order product search and COD/manual payment records.
 - Atomic stock reservation, lifecycle transitions, assignments, audit trail and activity timeline.
 - Picking/packing, customer-proof and delivery-exception queues.
-- Merchant delivery zones, fees, thresholds, driver assignments and cash collection.
+- Merchant delivery zones, fees, thresholds, internal drivers, external couriers and cash settlements.
 - Revocable customer tracking, versioned proof previews/approval and approved-version locking.
-- Catalog CSV import/export, order CSV export, customer history and bounded analytics.
+- Catalog CSV import/export, server-authorized order CSV export, customer search/profile history and bounded analytics.
+- Lightweight polling keeps order, proof, delivery, customer and admin views fresh without manual page refreshes.
 - Optional lightweight CSS 3D gallery with mobile/reduced-motion fallback.
 
 ## Configuration and docs

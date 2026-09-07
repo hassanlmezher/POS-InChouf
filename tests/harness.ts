@@ -24,6 +24,8 @@ const keyMap: Record<string, string> = {
   paymentmethod: 'paymentMethod',
   deliveryfee: 'deliveryFee',
   deliverystatus: 'deliveryStatus',
+  deliverymethod: 'deliveryMethod',
+  deliveryprovider: 'deliveryProvider',
   cashcollected: 'cashCollected',
   trackinghash: 'trackingHash',
   trialstart: 'trialStart',
@@ -32,6 +34,14 @@ const keyMap: Record<string, string> = {
   suspendeddate: 'suspendedDate',
   createdat: 'createdAt',
   updatedat: 'updatedAt',
+  owneremail: 'ownerEmail',
+  activecount: 'activeCount',
+  suspendedcount: 'suspendedCount',
+  monthlyvalue: 'monthlyValue',
+  periodstart: 'periodStart',
+  periodend: 'periodEnd',
+  createdby: 'createdBy',
+  settlementid: 'settlementId',
 };
 
 function normalize<T>(rows: Record<string, unknown>[]) {
@@ -175,18 +185,21 @@ export async function harness() {
     origin = host,
     extraHeaders: Record<string, string> = {},
   ) {
+    const multipart =
+      typeof FormData !== 'undefined' && data instanceof FormData;
+    const headers: Record<string, string> = {
+      Origin: origin,
+      Cookie: cookie,
+      'CF-Connecting-IP': '127.0.0.1',
+      ...extraHeaders,
+    };
+    if (!multipart) headers['Content-Type'] = 'application/json';
     return handle(
       new Request(`${host}/api/${path}`, {
         method,
-        headers: {
-          Origin: origin,
-          'Content-Type': 'application/json',
-          Cookie: cookie,
-          'CF-Connecting-IP': '127.0.0.1',
-          ...extraHeaders,
-        },
+        headers,
         ...(method !== 'GET' && data !== undefined
-          ? { body: JSON.stringify(data) }
+          ? { body: multipart ? (data as BodyInit) : JSON.stringify(data) }
           : {}),
       }),
       env,

@@ -60,6 +60,71 @@ async function checkout(h: Awaited<ReturnType<typeof setup>>, quantity = 1) {
   };
 }
 
+async function cookieForRole(
+  h: Awaited<ReturnType<typeof setup>>,
+  role: string,
+) {
+  const user = (await h.get<{ id: string }>(
+    'SELECT id FROM users WHERE role=? LIMIT 1',
+    role,
+  ))!;
+  const raw = token();
+  await h.run(
+    'INSERT INTO sessions (id,userId,expires) VALUES (?,?,?)',
+    hash(raw),
+    user.id,
+    Date.now() + 3600000,
+  );
+  return `op_session=${raw}`;
+}
+
+async function createPackedOrder(h: Awaited<ReturnType<typeof setup>>) {
+  const created = (await (
+    await h.request('store/internal-demo/orders', 'POST', await checkout(h))
+  ).json()) as { id: string };
+  for (const [version, status] of [
+    [0, 'Confirmed'],
+    [1, 'Picking'],
+    [2, 'Packed'],
+  ] as const) {
+    const response = await h.request(
+      `orders/${created.id}`,
+      'PATCH',
+      { version, status },
+      h.cookie,
+    );
+    assert.equal(response.status, 200, await response.text());
+  }
+  return created.id;
+}
+
+async function createDeliveredExternalOrder(
+  h: Awaited<ReturnType<typeof setup>>,
+  provider = 'Fast Courier',
+) {
+  const id = await createPackedOrder(h);
+  let response = await h.request(
+    `orders/${id}`,
+    'PATCH',
+    {
+      version: 3,
+      status: 'Out for Delivery',
+      deliveryMethod: 'external_courier',
+      deliveryProvider: provider,
+    },
+    h.cookie,
+  );
+  assert.equal(response.status, 200, await response.text());
+  response = await h.request(
+    `orders/${id}`,
+    'PATCH',
+    { version: 4, status: 'Delivered' },
+    h.cookie,
+  );
+  assert.equal(response.status, 200, await response.text());
+  return id;
+}
+
 void test('production bootstrap creates only the first platform admin', async () => {
   const h = await harness();
   const adminHost = 'https://admin.inchouf.com';
@@ -368,6 +433,113 @@ void test('PostgreSQL composite foreign keys reject cross-tenant relationships',
   );
 });
 
+void test('super admin business search and logo creation stay authorized and tenant-scoped', async () => {
+  const h = await setup();
+  const adminCookie = await cookieForRole(h, 'super_admin');
+  const unauthorized = await h.request(
+    'admin/tenants?q=internal-demo',
+    'GET',
+    undefined,
+    h.cookie,
+  );
+  assert.equal(unauthorized.status, 403);
+
+  const existing = await h.request(
+    'admin/tenants?q=internal-demo',
+    'GET',
+    undefined,
+    adminCookie,
+  );
+  const existingText = await existing.text();
+  assert.equal(existing.status, 200, existingText);
+  const existingData = JSON.parse(existingText) as {
+    total: number;
+    tenants: { slug: string }[];
+  };
+  assert.equal(existingData.total, 1);
+  assert.equal(existingData.tenants[0].slug, 'internal-demo');
+
+  const form = new FormData();
+  form.set('name', 'Logo Test Business');
+  form.set('slug', 'logo-test');
+  form.set('ownerName', 'Logo Owner');
+  form.set('email', 'logo-owner@example.com');
+  form.set('password', 'logo-owner-password');
+  form.set(
+    'logo',
+    new File(
+      [Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0])],
+      'شعار.png',
+      { type: 'image/png' },
+    ),
+  );
+  const created = await h.request(
+    'admin/tenants',
+    'POST',
+    form,
+    adminCookie,
+  );
+  assert.equal(created.status, 201, await created.text());
+
+  const tenant = (await h.get<{ id: string; settings: string }>(
+    'SELECT id,settings FROM tenants WHERE slug=?',
+    'logo-test',
+  ))!;
+  const logoId = JSON.parse(tenant.settings).branding.logoId as string;
+  assert.ok(logoId);
+  assert.equal(h.blobs.has(`${tenant.id}/${logoId}`), true);
+
+  const logo = await h.request('store/logo-test/logo');
+  assert.equal(logo.status, 200, await logo.text());
+  assert.equal(logo.headers.get('content-type'), 'image/png');
+  assert.equal((await h.request('store/internal-demo/logo')).status, 404);
+
+  const search = await h.request(
+    'admin/tenants?q=logo-test.inchouf.com',
+    'GET',
+    undefined,
+    adminCookie,
+  );
+  const searchData = (await search.json()) as {
+    total: number;
+    tenants: { slug: string; ownerEmail: string }[];
+  };
+  assert.equal(searchData.total, 1);
+  assert.equal(searchData.tenants[0].slug, 'logo-test');
+  assert.equal(searchData.tenants[0].ownerEmail, 'logo-owner@example.com');
+
+  const none = await h.request(
+    'admin/tenants?q=does-not-exist',
+    'GET',
+    undefined,
+    adminCookie,
+  );
+  assert.equal(((await none.json()) as { total: number }).total, 0);
+  const cleared = await h.request('admin/tenants', 'GET', undefined, adminCookie);
+  assert.equal(((await cleared.json()) as { total: number }).total, 2);
+});
+
+void test('invalid business logos are rejected before tenant creation', async () => {
+  const h = await setup();
+  const adminCookie = await cookieForRole(h, 'super_admin');
+  const form = new FormData();
+  form.set('name', 'Bad Logo Business');
+  form.set('slug', 'bad-logo');
+  form.set('ownerName', 'Bad Logo Owner');
+  form.set('email', 'bad-logo@example.com');
+  form.set('password', 'bad-logo-password');
+  form.set('logo', new File([Uint8Array.from([1, 2, 3])], 'bad.gif'));
+
+  const response = await h.request('admin/tenants', 'POST', form, adminCookie);
+  assert.equal(response.status, 400, await response.text());
+  assert.equal(
+    (await h.get<{ count: number }>(
+      "SELECT COUNT(*) count FROM tenants WHERE slug='bad-logo'",
+    ))!.count,
+    0,
+  );
+});
+
 void test('checkout reserves stock atomically and idempotency prevents duplicates', async () => {
   const h = await setup();
   const input = await checkout(h);
@@ -403,6 +575,50 @@ void test('checkout reserves stock atomically and idempotency prevents duplicate
     ))!.count,
     1,
   );
+});
+
+void test('customer search/profile are tenant scoped and order exports require manager roles', async () => {
+  const h = await setup();
+  await h.request('store/internal-demo/orders', 'POST', await checkout(h));
+
+  const customers = await h.request('customers?q=internal', 'GET', undefined, h.cookie);
+  const customersText = await customers.text();
+  assert.equal(customers.status, 200, customersText);
+  const customerRows = JSON.parse(customersText) as {
+    phone: string;
+    name: string;
+    orders: number;
+    outstanding: number;
+  }[];
+  assert.equal(customerRows.length, 1);
+  assert.equal(customerRows[0].phone, '0000000000');
+  assert.equal(customerRows[0].orders, 1);
+  assert.ok(customerRows[0].outstanding > 0);
+
+  const profile = await h.request(
+    `customers/${encodeURIComponent('0000000000')}`,
+    'GET',
+    undefined,
+    h.cookie,
+  );
+  const profileText = await profile.text();
+  assert.equal(profile.status, 200, profileText);
+  const profileData = JSON.parse(profileText) as {
+    customer: { phone: string; orders: number };
+    orders: { reference: string }[];
+  };
+  assert.equal(profileData.customer.phone, '0000000000');
+  assert.equal(profileData.orders.length, 1);
+
+  const pickerCookie = await cookieForRole(h, 'picker');
+  assert.equal(
+    (await h.request('orders/export', 'GET', undefined, pickerCookie)).status,
+    403,
+  );
+  const exported = await h.request('orders/export', 'GET', undefined, h.cookie);
+  const exportedText = await exported.text();
+  assert.equal(exported.status, 200, exportedText);
+  assert.match(exportedText, /"Reference","Customer","Phone"/);
 });
 
 void test('cancellation restores inventory once and preserves order state transitions', async () => {
@@ -444,42 +660,182 @@ void test('cancellation restores inventory once and preserves order state transi
   );
 });
 
-void test('packed delivery orders can be sent out by the business owner', async () => {
+void test('packed delivery orders require explicit internal driver or external courier', async () => {
   const h = await setup();
-  const owner = (await h.get<{ id: string }>(
-    "SELECT id FROM users WHERE role='owner'",
+  const driver = (await h.get<{ id: string }>(
+    "SELECT id FROM users WHERE role='delivery_manager'",
   ))!;
-  const created = (await (
-    await h.request('store/internal-demo/orders', 'POST', await checkout(h))
-  ).json()) as { id: string };
-  for (const [version, status] of [
-    [0, 'Confirmed'],
-    [1, 'Picking'],
-    [2, 'Packed'],
-  ] as const) {
-    const response = await h.request(
-      `orders/${created.id}`,
-      'PATCH',
-      { version, status },
-      h.cookie,
-    );
-    assert.equal(response.status, 200, await response.text());
-  }
+  const externalOrder = await createPackedOrder(h);
 
-  const response = await h.request(
-    `orders/${created.id}`,
+  const blocked = await h.request(
+    `orders/${externalOrder}`,
     'PATCH',
     { version: 3, status: 'Out for Delivery' },
+    h.cookie,
+  );
+  assert.equal(blocked.status, 400, await blocked.text());
+  assert.equal(
+    (
+      await h.get<{ driverId: string | null }>(
+        'SELECT driverId FROM orders WHERE id=?',
+        externalOrder,
+      )
+    )!.driverId,
+    null,
+  );
+
+  const response = await h.request(
+    `orders/${externalOrder}`,
+    'PATCH',
+    {
+      version: 3,
+      status: 'Out for Delivery',
+      deliveryMethod: 'external_courier',
+      deliveryProvider: 'Fast Courier',
+    },
     h.cookie,
   );
   const responseText = await response.text();
   assert.equal(response.status, 200, responseText);
   const detail = JSON.parse(responseText) as {
-    order: { status: string; driverId: string; deliveryStatus: string };
+    order: {
+      status: string;
+      driverId: string | null;
+      deliveryMethod: string;
+      deliveryProvider: string;
+      deliveryStatus: string;
+    };
   };
   assert.equal(detail.order.status, 'Out for Delivery');
-  assert.equal(detail.order.driverId, owner.id);
+  assert.equal(detail.order.driverId, null);
+  assert.equal(detail.order.deliveryMethod, 'external_courier');
+  assert.equal(detail.order.deliveryProvider, 'Fast Courier');
   assert.equal(detail.order.deliveryStatus, 'On the way');
+
+  const internalOrder = await createPackedOrder(h);
+  const internal = await h.request(
+    `orders/${internalOrder}`,
+    'PATCH',
+    {
+      version: 3,
+      status: 'Out for Delivery',
+      deliveryMethod: 'internal_driver',
+      driverId: driver.id,
+    },
+    h.cookie,
+  );
+  assert.equal(internal.status, 200, await internal.text());
+});
+
+void test('full COD cash collection marks the order paid', async () => {
+  const h = await setup();
+  const id = await createDeliveredExternalOrder(h);
+  const order = (await h.get<{ total: number }>(
+    'SELECT total FROM orders WHERE id=?',
+    id,
+  ))!;
+  const response = await h.request(
+    `orders/${id}`,
+    'PATCH',
+    { version: 5, cashCollected: order.total },
+    h.cookie,
+  );
+  const text = await response.text();
+  assert.equal(response.status, 200, text);
+  const detail = JSON.parse(text) as {
+    order: { payment: string; cashCollected: number };
+    events: { detail: string }[];
+  };
+  assert.equal(detail.order.payment, 'Paid');
+  assert.equal(detail.order.cashCollected, order.total);
+  assert.ok(detail.events.some((e) => e.detail.includes('Payment: Unpaid -> Paid')));
+});
+
+void test('cash settlements calculate variance, update balanced COD orders and prevent duplicates', async () => {
+  const h = await setup();
+  await createDeliveredExternalOrder(h, 'Fleet Co');
+  await createDeliveredExternalOrder(h, 'Fleet Co');
+  const expected = Number((await h.get<{ total: number }>(
+    "SELECT SUM(total) total FROM orders WHERE tenantId=? AND deliveryProvider='Fleet Co'",
+    h.tenant,
+  ))!.total);
+
+  const missing = await h.request(
+    'settlements',
+    'POST',
+    {
+      method: 'external_courier',
+      provider: 'Fleet Co',
+      actual: expected - 2700,
+    },
+    h.cookie,
+  );
+  const missingText = await missing.text();
+  assert.equal(missing.status, 201, missingText);
+  assert.deepEqual(JSON.parse(missingText), {
+    id: JSON.parse(missingText).id,
+    expected,
+    actual: expected - 2700,
+    variance: -2700,
+    status: 'missing',
+  });
+  assert.equal(
+    (
+      await h.request(
+        'settlements',
+        'POST',
+        {
+          method: 'external_courier',
+          provider: 'Fleet Co',
+          actual: expected,
+        },
+        h.cookie,
+      )
+    ).status,
+    409,
+  );
+
+  await createDeliveredExternalOrder(h, 'Balanced Co');
+  const balancedExpected = Number((await h.get<{ total: number }>(
+    "SELECT SUM(total) total FROM orders WHERE tenantId=? AND deliveryProvider='Balanced Co'",
+    h.tenant,
+  ))!.total);
+  const balanced = await h.request(
+    'settlements',
+    'POST',
+    {
+      method: 'external_courier',
+      provider: 'Balanced Co',
+      actual: balancedExpected,
+    },
+    h.cookie,
+  );
+  assert.equal(balanced.status, 201, await balanced.text());
+  assert.equal(
+    (
+      await h.get<{ payment: string; cashCollected: number }>(
+        "SELECT payment,cashCollected FROM orders WHERE tenantId=? AND deliveryProvider='Balanced Co'",
+        h.tenant,
+      )
+    )!.payment,
+    'Paid',
+  );
+  const pickerCookie = await cookieForRole(h, 'picker');
+  assert.equal(
+    (
+      await h.request(
+        'settlements',
+        'POST',
+        {
+          method: 'external_courier',
+          provider: 'Nope',
+          actual: 0,
+        },
+        pickerCookie,
+      )
+    ).status,
+    403,
+  );
 });
 
 void test('Supabase Auth-backed login creates app sessions and enforces expiry and suspension', async () => {

@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Sheet,
   SheetContent,
@@ -28,7 +28,7 @@ export default function OrderDetail({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const r = useResource<Detail>(`orders/${id}`),
+  const r = useResource<Detail>(`orders/${id}`, { intervalMs: 10000 }),
     team = useResource<User[]>('team'),
     files = useResource<{ id: string; name: string }[]>(`orders/${id}/files`);
   const [busy, setBusy] = useState(false),
@@ -37,9 +37,33 @@ export default function OrderDetail({
     [tracking, setTracking] = useState(''),
     [proofFile, setProofFile] = useState(''),
     [proofNote, setProofNote] = useState(''),
-    [cash, setCash] = useState('');
+    [cash, setCash] = useState(''),
+    [deliveryMethod, setDeliveryMethod] = useState<
+      'internal_driver' | 'external_courier'
+    >('internal_driver'),
+    [deliveryProvider, setDeliveryProvider] = useState('');
   const o = r.data?.order;
   const manager = ['owner', 'order_manager'].includes(user.role);
+  const orderId = o?.id;
+  const orderDeliveryMethod = o?.deliveryMethod;
+  const orderDeliveryProvider = o?.deliveryProvider;
+  useEffect(() => {
+    if (!orderId) return;
+    setDeliveryMethod(orderDeliveryMethod || 'internal_driver');
+    setDeliveryProvider(orderDeliveryProvider || '');
+  }, [orderId, orderDeliveryMethod, orderDeliveryProvider]);
+  const normalStatus: Record<string, { label: string; status: string }> = {
+    New: { label: 'Confirm order', status: 'Confirmed' },
+    Confirmed: { label: 'Start picking', status: 'Picking' },
+    Picking: { label: 'Mark as packed', status: 'Packed' },
+    Packed: { label: 'Hand off for delivery', status: 'Out for Delivery' },
+    'Out for Delivery': { label: 'Mark delivered', status: 'Delivered' },
+  };
+  const normalDelivery: Record<string, string> = {
+    Pending: 'Picked up',
+    'Picked up': 'On the way',
+    'On the way': 'Delivered',
+  };
   const save = async (data: Record<string, unknown>) => {
     if (!o) return;
     setBusy(true);
@@ -146,17 +170,131 @@ export default function OrderDetail({
                           placeholder="Add helpful context for the team"
                         />
                       </Field>
+                      {manager && (
+                        <div className="note-block form-stack">
+                          <Choice
+                            label="Delivery method"
+                            value={deliveryMethod}
+                            onChange={(v) =>
+                              setDeliveryMethod(
+                                v as 'internal_driver' | 'external_courier',
+                              )
+                            }
+                            options={[
+                              {
+                                value: 'internal_driver',
+                                label: 'Internal driver',
+                              },
+                              {
+                                value: 'external_courier',
+                                label: 'External courier',
+                              },
+                            ]}
+                          />
+                          {deliveryMethod === 'external_courier' && (
+                            <Field label="External courier">
+                              <input
+                                value={deliveryProvider}
+                                maxLength={120}
+                                placeholder="Courier or delivery company"
+                                onChange={(e) =>
+                                  setDeliveryProvider(e.target.value)
+                                }
+                              />
+                            </Field>
+                          )}
+                          <button
+                            className="button secondary small"
+                            disabled={busy}
+                            onClick={() =>
+                              save({
+                                deliveryMethod,
+                                deliveryProvider:
+                                  deliveryMethod === 'external_courier'
+                                    ? deliveryProvider.trim()
+                                    : '',
+                              })
+                            }
+                          >
+                            Save delivery method
+                          </button>
+                        </div>
+                      )}
+                      {user.role !== 'delivery_manager' &&
+                        normalStatus[o.status] &&
+                        !(
+                          user.role === 'picker' &&
+                          !['Confirmed', 'Picking'].includes(o.status)
+                        ) && (
+                          <>
+                            <button
+                              className="button"
+                              disabled={
+                                busy ||
+                                (o.status === 'Packed' &&
+                                  deliveryMethod === 'internal_driver' &&
+                                  !o.driverId)
+                              }
+                              onClick={() =>
+                                save({
+                                  status: normalStatus[o.status].status,
+                                  deliveryMethod:
+                                    o.status === 'Packed'
+                                      ? deliveryMethod
+                                      : undefined,
+                                  deliveryProvider:
+                                    o.status === 'Packed' &&
+                                    deliveryMethod === 'external_courier'
+                                      ? deliveryProvider.trim()
+                                      : undefined,
+                                  reason: note,
+                                })
+                              }
+                            >
+                              {normalStatus[o.status].label}
+                            </button>
+                            {o.status === 'Packed' &&
+                              deliveryMethod === 'internal_driver' &&
+                              !o.driverId && (
+                                <small className="danger-text">
+                                  Assign a driver or choose external courier
+                                  before handoff.
+                                </small>
+                              )}
+                          </>
+                        )}
+                      {user.role === 'delivery_manager' &&
+                        normalDelivery[o.deliveryStatus] && (
+                          <button
+                            className="button"
+                            disabled={busy}
+                            onClick={() =>
+                              save({
+                                deliveryStatus:
+                                  normalDelivery[o.deliveryStatus],
+                                reason: note,
+                              })
+                            }
+                          >
+                            {normalDelivery[o.deliveryStatus] === 'Picked up'
+                              ? 'Mark picked up'
+                              : normalDelivery[o.deliveryStatus] === 'On the way'
+                                ? 'Start delivery'
+                                : 'Mark delivered'}
+                          </button>
+                        )}
                       <div className="inline-actions">
                         {user.role !== 'delivery_manager' &&
                           transitions[o.status]
                             .filter(
                               (s) =>
-                                user.role !== 'picker' ||
-                                [
-                                  'Picking',
-                                  'Packed',
-                                  'Needs Attention',
-                                ].includes(s),
+                                s !== normalStatus[o.status]?.status &&
+                                (user.role !== 'picker' ||
+                                  [
+                                    'Picking',
+                                    'Packed',
+                                    'Needs Attention',
+                                  ].includes(s)),
                             )
                             .map((s) => (
                               <button
@@ -231,22 +369,24 @@ export default function OrderDetail({
                       )}
                       {['owner', 'delivery_manager'].includes(user.role) && (
                         <>
-                          <Choice
-                            label="Delivery update"
-                            value={o.deliveryStatus}
-                            onChange={(v) =>
-                              save({ deliveryStatus: v, reason: note })
-                            }
-                            options={[
-                              'Pending',
-                              'Picked up',
-                              'On the way',
-                              'Delivered',
+                          <div className="inline-actions">
+                            {[
                               'Failed',
                               'Customer unavailable',
                               'Returned',
-                            ]}
-                          />
+                            ].map((v) => (
+                              <button
+                                key={v}
+                                className="button secondary small"
+                                disabled={busy || !note.trim()}
+                                onClick={() =>
+                                  save({ deliveryStatus: v, reason: note })
+                                }
+                              >
+                                {v}
+                              </button>
+                            ))}
+                          </div>
                           <Field
                             label={`Cash collected · recorded ${money(o.cashCollected)}`}
                           >
