@@ -378,6 +378,39 @@ void test('tenant isolation covers catalog, orders, storefronts and settings', a
     ).status,
     400,
   );
+  const tenantSettings = JSON.parse(
+    (await h.get<{ settings: string }>('SELECT settings FROM tenants WHERE id=?', h.tenant))!
+      .settings,
+  );
+  tenantSettings.branding = { logoId: 'existing-logo' };
+  await h.run(
+    'UPDATE tenants SET settings=? WHERE id=?',
+    JSON.stringify(tenantSettings),
+    h.tenant,
+  );
+  const settingsUpdate = await h.request(
+    'settings',
+    'PATCH',
+    {
+      tagline: 'Updated storefront',
+      description: 'Updated description',
+      contactEmail: '',
+      contactPhone: '0000000000',
+      address: 'Updated address',
+      theme3d: false,
+      paymentOptions: ['Cash on delivery'],
+      categories: ['General'],
+      currency: 'USD',
+    },
+    h.cookie,
+  );
+  assert.equal(settingsUpdate.status, 200, await settingsUpdate.text());
+  const savedSettings = JSON.parse(
+    (await h.get<{ settings: string }>('SELECT settings FROM tenants WHERE id=?', h.tenant))!
+      .settings,
+  );
+  assert.deepEqual(savedSettings.branding, { logoId: 'existing-logo' });
+  assert.equal(savedSettings.tagline, 'Updated storefront');
   assert.equal(
     (
       await h.request(

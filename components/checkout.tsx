@@ -197,7 +197,11 @@ export default function Checkout({
         </div>
       </div>
       <ErrorBox error={error} />
-      <Submit busy={busy} disabled={!zone || !lines.length || !!stockIssue}>
+      <Submit
+        busy={busy}
+        busyLabel="Placing order…"
+        disabled={!zone || !lines.length || !!stockIssue}
+      >
         Place order · {money(subtotal + fee)}
       </Submit>
       <small>

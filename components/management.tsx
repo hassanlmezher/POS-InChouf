@@ -6,6 +6,7 @@ import {
   Choice,
   Toggle,
   ErrorBox,
+  ActionButton,
   Submit,
   StatusBadge,
   EmptyState,
@@ -213,7 +214,8 @@ function ZoneEditor({
 export function Team() {
   const r = useResource<User[]>('employees');
   const [open, setOpen] = useState(false),
-    [error, setError] = useState('');
+    [error, setError] = useState(''),
+    [busyId, setBusyId] = useState('');
   return (
     <>
       <div className="page-heading">
@@ -225,7 +227,7 @@ export function Team() {
           Add employee
         </button>
       </div>
-      <ErrorBox error={error || r.error} />
+      <ErrorBox error={error || r.error} retry={r.refresh} />
       <div className="panel">
         <Table className="op-table">
           <TableHeader>
@@ -250,10 +252,12 @@ export function Team() {
                     <Choice
                       label={`Role for ${u.name}`}
                       value={u.role}
+                      disabled={busyId === u.id}
                       options={Object.entries(roleLabels)
                         .filter(([k]) => !['owner', 'super_admin'].includes(k))
                         .map(([value, label]) => ({ value, label }))}
                       onChange={async (role) => {
+                        setBusyId(u.id);
                         try {
                           await api(`team/${u.id}`, 'PATCH', {
                             active: Boolean(u.active),
@@ -262,6 +266,8 @@ export function Team() {
                           await r.refresh();
                         } catch (e) {
                           setError(message(e));
+                        } finally {
+                          setBusyId('');
                         }
                       }}
                     />
@@ -272,9 +278,12 @@ export function Team() {
                 </TableCell>
                 <TableCell>
                   {u.role !== 'owner' && (
-                    <button
+                    <ActionButton
                       className="text-link"
+                      busy={busyId === u.id}
+                      busyLabel="Updating…"
                       onClick={async () => {
+                        setBusyId(u.id);
                         try {
                           await api(`team/${u.id}`, 'PATCH', {
                             active: !u.active,
@@ -283,11 +292,13 @@ export function Team() {
                           await r.refresh();
                         } catch (e) {
                           setError(message(e));
+                        } finally {
+                          setBusyId('');
                         }
                       }}
                     >
                       {u.active ? 'Deactivate' : 'Activate'}
-                    </button>
+                    </ActionButton>
                   )}
                 </TableCell>
               </TableRow>
@@ -392,6 +403,17 @@ export function StoreSettings({
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
     [success, setSuccess] = useState(false);
+  const editableSettings = {
+    tagline: s.tagline,
+    description: s.description,
+    contactEmail: s.contactEmail,
+    contactPhone: s.contactPhone,
+    address: s.address,
+    theme3d: s.theme3d,
+    paymentOptions: s.paymentOptions,
+    categories: s.categories,
+    currency: s.currency,
+  };
   return (
     <>
       <div className="page-heading">
@@ -416,7 +438,7 @@ export function StoreSettings({
           setError('');
           setSuccess(false);
           try {
-            await api('settings', 'PATCH', s);
+            await api('settings', 'PATCH', editableSettings);
             setSuccess(true);
             refresh();
           } catch (e) {

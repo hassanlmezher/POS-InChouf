@@ -120,6 +120,7 @@ export default function ProductEditor({
           <input
             type="file"
             accept="image/png,image/jpeg"
+            disabled={busy}
             onChange={async (e) => {
               const f = e.target.files?.[0];
               if (!f) return;
@@ -265,7 +266,7 @@ export default function ProductEditor({
           <button type="button" className="button secondary" onClick={onClose}>
             Cancel
           </button>
-          <Submit busy={busy} />
+          <Submit busy={busy} busyLabel="Saving product…" />
         </div>
       </form>
     </Modal>

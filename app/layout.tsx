@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { WorkingIndicator } from '@/components/shared';
 export const metadata: Metadata = {
   title: 'InChouf OrderPilot — From order to doorstep',
   description:
@@ -12,7 +13,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <WorkingIndicator />
+        {children}
+      </body>
     </html>
   );
 }

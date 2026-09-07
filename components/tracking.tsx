@@ -7,7 +7,8 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { useResource } from '@/lib/client';
-import { Loading, ErrorBox, StatusBadge } from './shared';
+import { ActionButton, Loading, ErrorBox, StatusBadge } from './shared';
+import { useState } from 'react';
 import { type Order, type Item, type Event, money } from '@/lib/types';
 export default function Tracking({
   slug,
@@ -16,6 +17,7 @@ export default function Tracking({
   slug: string;
   token: string;
 }) {
+  const [refreshing, setRefreshing] = useState(false);
   const path = `store/${slug}/track/${token}`;
   const r = useResource<{
     tenant: { name: string };
@@ -87,9 +89,21 @@ export default function Tracking({
           </div>
         ))}
       </div>
-      <button className="text-link" onClick={r.refresh}>
+      <ActionButton
+        className="text-link progress-action"
+        busy={refreshing}
+        busyLabel="Refreshing…"
+        onClick={async () => {
+          setRefreshing(true);
+          try {
+            await r.refresh();
+          } finally {
+            setRefreshing(false);
+          }
+        }}
+      >
         Refresh order status
-      </button>
+      </ActionButton>
       <div className="panel">
         <div className="panel-head">
           <h3>Your order</h3>

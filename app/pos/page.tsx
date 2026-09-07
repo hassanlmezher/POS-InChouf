@@ -47,6 +47,7 @@ import {
   ErrorBox,
   EmptyState,
   StatusBadge,
+  ActionButton,
   Field,
   Modal,
   ProductImage,
@@ -177,6 +178,7 @@ export default function Pos() {
     [editing, setEditing] = useState<Product | null | undefined>(undefined),
     [manual, setManual] = useState(false),
     [error, setError] = useState(''),
+    [loggingOut, setLoggingOut] = useState(false),
     [toast, setToast] = useState<{
       kind: 'success' | 'error';
       text: string;
@@ -389,16 +391,24 @@ export default function Pos() {
               <small>{roleLabels[user.role]}</small>
             </div>
           </div>
-          <button
+          <ActionButton
             className="text-link"
+            busy={loggingOut}
+            busyLabel="Signing out…"
             onClick={async () => {
-              await api('logout', 'POST');
-              location.href = '/login';
+              setLoggingOut(true);
+              try {
+                await api('logout', 'POST');
+                location.href = '/login';
+              } catch (e) {
+                setError(message(e));
+                setLoggingOut(false);
+              }
             }}
           >
             <LogOut size={14} style={{ display: 'inline', marginRight: 8 }} />
             Sign out
-          </button>
+          </ActionButton>
         </SidebarFooter>
       </Sidebar>
       <main className="app-main">

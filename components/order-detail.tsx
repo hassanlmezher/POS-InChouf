@@ -7,7 +7,14 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet';
-import { Field, Choice, ErrorBox, StatusBadge, Loading } from './shared';
+import {
+  ActionButton,
+  Field,
+  Choice,
+  ErrorBox,
+  StatusBadge,
+  Loading,
+} from './shared';
 import { api, useResource, message } from '@/lib/client';
 import { money, type Detail, type User } from '@/lib/types';
 export default function OrderDetail({
@@ -24,6 +31,7 @@ export default function OrderDetail({
   const r = useResource<Detail>(`orders/${id}`, { intervalMs: 10000 }),
     team = useResource<User[]>('team');
   const [busy, setBusy] = useState(false),
+    [trackingBusy, setTrackingBusy] = useState<'create' | 'revoke' | ''>(''),
     [error, setError] = useState(''),
     [tracking, setTracking] = useState(''),
     [cash, setCash] = useState(''),
@@ -172,9 +180,9 @@ export default function OrderDetail({
                               />
                             </Field>
                           )}
-                          <button
+                          <ActionButton
                             className="button secondary small"
-                            disabled={busy}
+                            busy={busy}
                             onClick={() =>
                               save({
                                 deliveryMethod,
@@ -186,7 +194,7 @@ export default function OrderDetail({
                             }
                           >
                             Save delivery method
-                          </button>
+                          </ActionButton>
                         </div>
                       )}
                       {manager && (
@@ -194,6 +202,7 @@ export default function OrderDetail({
                           <Choice
                             label="Assigned employee"
                             value={o.employeeId || 'none'}
+                            disabled={busy}
                             onChange={(v) =>
                               save({ employeeId: v === 'none' ? null : v })
                             }
@@ -208,6 +217,7 @@ export default function OrderDetail({
                           <Choice
                             label="Assigned driver"
                             value={o.driverId || 'none'}
+                            disabled={busy}
                             onChange={(v) =>
                               save({ driverId: v === 'none' ? null : v })
                             }
@@ -225,6 +235,7 @@ export default function OrderDetail({
                           <Choice
                             label="Payment status"
                             value={o.payment}
+                            disabled={busy}
                             onChange={(v) => save({ payment: v })}
                             options={['Unpaid', 'Paid', 'Refunded']}
                           />
@@ -245,9 +256,10 @@ export default function OrderDetail({
                               onChange={(e) => setCash(e.target.value)}
                             />
                           </Field>
-                          <button
+                          <ActionButton
                             className="button secondary"
-                            disabled={busy || cash === ''}
+                            busy={busy}
+                            disabled={cash === ''}
                             onClick={() =>
                               save({
                                 cashCollected: Math.round(Number(cash) * 100),
@@ -255,7 +267,7 @@ export default function OrderDetail({
                             }
                           >
                             Record cash collected
-                          </button>
+                          </ActionButton>
                         </>
                       )}
                       <ErrorBox error={error} />
@@ -274,9 +286,13 @@ export default function OrderDetail({
                           </small>
                         </p>
                         <div className="inline-actions">
-                          <button
+                          <ActionButton
                             className="button secondary small"
+                            busy={trackingBusy === 'create'}
+                            disabled={trackingBusy !== ''}
+                            busyLabel="Creating…"
                             onClick={async () => {
+                              setTrackingBusy('create');
                               try {
                                 const d = await api<{ trackingUrl: string }>(
                                   `orders/${id}/tracking`,
@@ -286,14 +302,20 @@ export default function OrderDetail({
                                 setTracking(location.origin + d.trackingUrl);
                               } catch (e) {
                                 setError(message(e));
+                              } finally {
+                                setTrackingBusy('');
                               }
                             }}
                           >
                             Create new link
-                          </button>
-                          <button
+                          </ActionButton>
+                          <ActionButton
                             className="button secondary small"
+                            busy={trackingBusy === 'revoke'}
+                            disabled={trackingBusy !== ''}
+                            busyLabel="Revoking…"
                             onClick={async () => {
+                              setTrackingBusy('revoke');
                               try {
                                 await api(`orders/${id}/tracking`, 'POST', {
                                   revoke: true,
@@ -301,11 +323,13 @@ export default function OrderDetail({
                                 setTracking('Link revoked');
                               } catch (e) {
                                 setError(message(e));
+                              } finally {
+                                setTrackingBusy('');
                               }
                             }}
                           >
                             Revoke link
-                          </button>
+                          </ActionButton>
                         </div>
                         {tracking && (
                           <div

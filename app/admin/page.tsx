@@ -16,6 +16,7 @@ import {
   Field,
   Choice,
   Toggle,
+  ActionButton,
   Submit,
   StatusBadge,
   EmptyState,
@@ -36,7 +37,9 @@ export default function Admin() {
     [debouncedQuery, setDebouncedQuery] = useState(''),
     [activeFilter, setActiveFilter] = useState('all'),
     [subscriptionFilter, setSubscriptionFilter] = useState('all'),
-    [page, setPage] = useState(0);
+    [page, setPage] = useState(0),
+    [loggingOut, setLoggingOut] = useState(false),
+    [logoutError, setLogoutError] = useState('');
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setDebouncedQuery(query.trim());
@@ -113,16 +116,25 @@ export default function Admin() {
           <ShieldCheck size={14} style={{ marginRight: 6 }} />
           Platform control
         </span>
-        <button
+        <ActionButton
           className="text-link"
+          busy={loggingOut}
+          busyLabel="Signing out…"
           onClick={async () => {
-            await api('logout', 'POST');
-            location.href = '/login';
+            setLoggingOut(true);
+            setLogoutError('');
+            try {
+              await api('logout', 'POST');
+              location.href = '/login';
+            } catch (e) {
+              setLogoutError(message(e));
+              setLoggingOut(false);
+            }
           }}
         >
           <LogOut size={16} />
           Sign out
-        </button>
+        </ActionButton>
       </header>
       <main className="workspace">
         <div className="page-heading">
@@ -157,6 +169,7 @@ export default function Admin() {
           ))}
         </div>
         <ErrorBox error={r.error} retry={r.refresh} />
+        <ErrorBox error={logoutError} />
         <div className="panel">
           <div className="panel-head">
             <h3>Businesses</h3>

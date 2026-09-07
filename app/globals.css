@@ -819,6 +819,29 @@ input.search-input {
   color: #9b394c;
   border: 1px solid #f1d1d6;
 }
+.working-indicator {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  z-index: 100;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transform: translateX(-50%);
+  padding: 8px 13px;
+  border: 1px solid #e1dfe8;
+  border-radius: 999px;
+  background: #fff;
+  color: #5f526d;
+  box-shadow: 0 10px 28px rgba(47, 34, 67, 0.14);
+  font-size: 13px;
+  font-weight: 600;
+}
+.error-box button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 .loading-state {
   display: grid;
   gap: 25px;
@@ -1597,12 +1620,18 @@ input.search-input {
   background: #f6f2fa;
 }
 .store-nav {
+  position: sticky;
+  top: 0;
+  z-index: 40;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 26px 4%;
   max-width: 1400px;
   margin: auto;
+  background: rgba(255, 255, 255, 0.96);
+  border-bottom: 1px solid transparent;
+  backdrop-filter: blur(10px);
 }
 .store-brand {
   display: flex;

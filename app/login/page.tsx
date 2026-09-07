@@ -83,7 +83,7 @@ export default function Login() {
               />
             </Field>
             <ErrorBox error={error} />
-            <Submit busy={busy || !ready}>
+            <Submit busy={busy || !ready} busyLabel="Signing in…">
               Sign in <ArrowRight size={16} />
             </Submit>
           </form>

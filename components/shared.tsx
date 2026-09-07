@@ -1,5 +1,5 @@
 'use client';
-import { type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Package, Loader2 } from 'lucide-react';
 import {
   Dialog,
@@ -18,6 +18,11 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Empty, EmptyTitle, EmptyDescription } from '@/components/ui/empty';
+import {
+  endPageNavigation,
+  startPageNavigation,
+  useNetworkActivity,
+} from '@/lib/client';
 export function Brand() {
   return (
     <a className="brand" href="/">
@@ -44,17 +49,23 @@ export function Choice({
   value,
   onChange,
   options,
+  disabled = false,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   options: (string | { value: string; label: string })[];
+  disabled?: boolean;
 }) {
   return (
     <div className="field">
       <span>{label}</span>
       <Select value={value} onValueChange={(v) => v !== null && onChange(v)}>
-        <SelectTrigger aria-label={label} className="choice-trigger">
+        <SelectTrigger
+          aria-label={label}
+          className="choice-trigger"
+          disabled={disabled}
+        >
           <SelectValue>
             {options
               .map((x) => (typeof x === 'string' ? { value: x, label: x } : x))
@@ -123,12 +134,73 @@ export function ErrorBox({
   retry,
 }: {
   error: string;
-  retry?: () => void;
+  retry?: () => void | Promise<void>;
 }) {
-  return error ? (
+  const [retrying, setRetrying] = useState(false);
+  if (!error) return null;
+  return (
     <div className="error-box" role="alert">
       {error}
-      {retry && <button onClick={retry}>Try again</button>}
+      {retry && (
+        <button
+          disabled={retrying}
+          aria-busy={retrying}
+          onClick={async () => {
+            if (retrying) return;
+            setRetrying(true);
+            try {
+              await retry();
+            } finally {
+              setRetrying(false);
+            }
+          }}
+        >
+          {retrying && <Loader2 size={14} className="animate-spin" />}
+          {retrying ? 'Retrying…' : 'Try again'}
+        </button>
+      )}
+    </div>
+  );
+}
+export function WorkingIndicator() {
+  const active = useNetworkActivity();
+  useEffect(() => {
+    const onClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      const link = target?.closest('a');
+      if (!link || event.defaultPrevented || event.button !== 0) return;
+      if (
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey ||
+        link.target === '_blank' ||
+        link.hasAttribute('download')
+      )
+        return;
+      const href = link.getAttribute('href');
+      if (!href || href.startsWith('#') || href.startsWith('mailto:')) return;
+      try {
+        const url = new URL(href, location.href);
+        if (url.origin !== location.origin || url.href === location.href) return;
+        startPageNavigation();
+        window.setTimeout(endPageNavigation, 10000);
+      } catch {
+        // Let the browser handle malformed links normally.
+      }
+    };
+    const onPageHide = () => endPageNavigation();
+    document.addEventListener('click', onClick);
+    window.addEventListener('pagehide', onPageHide);
+    return () => {
+      document.removeEventListener('click', onClick);
+      window.removeEventListener('pagehide', onPageHide);
+    };
+  }, []);
+  return active ? (
+    <div className="working-indicator" role="status" aria-live="polite">
+      <Loader2 size={15} className="animate-spin" />
+      <span>Working…</span>
     </div>
   ) : null;
 }
@@ -194,16 +266,53 @@ export function StatusBadge({ value }: { value: string }) {
 export function Submit({
   busy,
   disabled = false,
+  busyLabel = 'Saving…',
   children = 'Save changes',
 }: {
   busy: boolean;
   disabled?: boolean;
+  busyLabel?: ReactNode;
   children?: ReactNode;
 }) {
   return (
-    <button type="submit" className="button" disabled={busy || disabled}>
+    <button
+      type="submit"
+      className="button"
+      disabled={busy || disabled}
+      aria-busy={busy}
+    >
       {busy && <Loader2 size={16} className="animate-spin" />}
-      {busy ? 'Saving…' : children}
+      {busy ? busyLabel : children}
+    </button>
+  );
+}
+export function ActionButton({
+  busy = false,
+  disabled = false,
+  busyLabel = 'Working…',
+  className = 'button',
+  onClick,
+  children,
+}: {
+  busy?: boolean;
+  disabled?: boolean;
+  busyLabel?: ReactNode;
+  className?: string;
+  onClick?: () => void | Promise<void>;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      className={className}
+      disabled={busy || disabled}
+      aria-busy={busy}
+      onClick={() => {
+        if (!busy) void onClick?.();
+      }}
+    >
+      {busy && <Loader2 size={15} className="animate-spin" />}
+      {busy ? busyLabel : children}
     </button>
   );
 }
