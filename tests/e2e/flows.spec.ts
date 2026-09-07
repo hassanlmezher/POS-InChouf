@@ -85,9 +85,6 @@ test('Owner catalog, role-specific workspace and admin controls', async ({
     page.getByRole('heading', { name: 'Internal E2E test product' }).first(),
   ).toBeVisible();
   await page.getByRole('button', { name: 'Storefront', exact: true }).click();
-  await expect(
-    page.getByText('Offer the optional 3D Experience'),
-  ).toBeVisible();
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();
   await expect(page).toHaveURL(/\/login$/);
   await login(page, 'picker');
@@ -111,7 +108,7 @@ test('Owner catalog, role-specific workspace and admin controls', async ({
     fullPage: true,
   });
 });
-test('Mobile storefront, bag and 3D reduced-motion fallback', async ({
+test('Mobile storefront, bag and checkout', async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -129,12 +126,6 @@ test('Mobile storefront, bag and 3D reduced-motion fallback', async ({
     path: 'docs/screenshots/store-mobile.png',
     fullPage: true,
   });
-  await page.getByRole('button', { name: 'Explore the 3D Experience' }).click();
-  await expect(
-    page.getByText(
-      'Standard view is optimized for this device and your motion preferences.',
-    ),
-  ).toBeVisible();
   await page
     .getByRole('button', { name: 'View Studio headphones', exact: true })
     .last()

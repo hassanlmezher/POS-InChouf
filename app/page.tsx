@@ -213,10 +213,6 @@ export default function Home() {
                 'Custom when you need it',
                 'Collect text details at checkout and keep preparation instructions with the order.',
               ],
-              [
-                'An optional 3D experience',
-                'Add depth to your storefront, with a standard layout always available.',
-              ],
             ].map(([t, d]) => (
               <article className="feature-card" key={t}>
                 <CheckCircle2 size={23} />

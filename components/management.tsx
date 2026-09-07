@@ -20,7 +20,7 @@ import {
   TableBody,
   TableCell,
 } from '@/components/ui/table';
-import { api, useResource, message } from '@/lib/client';
+import { api, uploadFile, useResource, message } from '@/lib/client';
 import {
   type Zone,
   type User,
@@ -401,6 +401,7 @@ export function StoreSettings({
 }) {
   const [s, setS] = useState<Settings>(settingsOf(tenant)),
     [busy, setBusy] = useState(false),
+    [logoBusy, setLogoBusy] = useState(false),
     [error, setError] = useState(''),
     [success, setSuccess] = useState(false);
   const editableSettings = {
@@ -409,10 +410,10 @@ export function StoreSettings({
     contactEmail: s.contactEmail,
     contactPhone: s.contactPhone,
     address: s.address,
-    theme3d: s.theme3d,
     paymentOptions: s.paymentOptions,
     categories: s.categories,
     currency: s.currency,
+    branding: s.branding,
   };
   return (
     <>
@@ -498,20 +499,56 @@ export function StoreSettings({
               }
             />
           </Field>
-          <div className="note-block">
-            <Toggle
-              label="Offer the optional 3D Experience"
-              value={s.theme3d}
-              onChange={(theme3d) => setS({ ...s, theme3d })}
+          <Field label="Business logo" hint="PNG or JPEG, up to 5 MB.">
+            {s.branding?.logoId && (
+              <div className="logo-preview">
+                <img
+                  src={`/api/files/${s.branding.logoId}`}
+                  alt="Current business logo"
+                />
+              </div>
+            )}
+            <input
+              type="file"
+              accept="image/png,image/jpeg"
+              disabled={busy || logoBusy}
+              onChange={async (e) => {
+                const file = e.currentTarget.files?.[0];
+                e.currentTarget.value = '';
+                if (!file) return;
+                if (!['image/png', 'image/jpeg'].includes(file.type)) {
+                  setError('Choose a PNG or JPEG business logo.');
+                  return;
+                }
+                if (file.size > 5 * 1024 * 1024) {
+                  setError('Business logo must be smaller than 5 MB.');
+                  return;
+                }
+                setLogoBusy(true);
+                setError('');
+                try {
+                  const uploaded = await uploadFile('files', file);
+                  setS((current) => ({
+                    ...current,
+                    branding: { logoId: uploaded.id },
+                  }));
+                } catch (error) {
+                  setError(message(error));
+                } finally {
+                  setLogoBusy(false);
+                }
+              }}
             />
-            <p>
-              <small>
-                A lightweight perspective product gallery. Normal shopping stays
-                available; reduced-motion and mobile devices get the standard
-                layout.
-              </small>
-            </p>
-          </div>
+            {logoBusy && <small role="status">Uploading logo…</small>}
+            {s.branding?.logoId && !logoBusy && (
+              <ActionButton
+                className="text-link"
+                onClick={() => setS({ ...s, branding: { logoId: null } })}
+              >
+                Remove logo
+              </ActionButton>
+            )}
+          </Field>
           <ErrorBox error={error} />
           {success && (
             <div className="success-box" role="status">
@@ -519,7 +556,10 @@ export function StoreSettings({
             </div>
           )}
           <div className="form-actions">
-            <Submit busy={busy} />
+            <Submit
+              busy={busy || logoBusy}
+              busyLabel={logoBusy ? 'Uploading logo…' : 'Saving changes…'}
+            />
           </div>
         </div>
       </form>

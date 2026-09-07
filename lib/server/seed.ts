@@ -45,7 +45,6 @@ export async function seedDemo(env: Runtime, passwords: DemoCredentials) {
     tagline: 'Good things. A simpler way to shop.',
     description:
       'An internal InChouf demo collection. All products and orders are for testing only.',
-    theme3d: true,
     categories: ['Audio', 'Everyday', 'Home', 'Personalized'],
   };
   try {

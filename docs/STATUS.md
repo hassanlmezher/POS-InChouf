@@ -21,7 +21,7 @@ Project: `/Users/hassanmezher/Desktop/Projects/inchoufPos`.
 - Lint: pass.
 - Security/integration: PostgreSQL/PGlite tests passed, covering tenant isolation, authorization, CSRF, sessions, inventory and tracking.
 - Browser suite: 4 end-to-end tests passed together; additional mobile POS test passed separately.
-- Responsive checks: 390×844 storefront, checkout, marketing and POS; desktop POS/admin/tracking; reduced-motion 3D fallback.
+- Responsive checks: 390×844 storefront, checkout, marketing and POS; desktop POS/admin/tracking.
 - Production build: pass. Vinext reports its known static-route classification limitation; production runtime still needs verification.
 - npm audit: zero vulnerabilities across production and development dependencies at verification time.
 

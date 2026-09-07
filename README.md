@@ -42,7 +42,6 @@ The local bootstrap email defaults to `admin@demo.inchouf.test`, and its random 
 - Revocable customer tracking with account-free order progress.
 - Catalog CSV import/export, server-authorized order CSV export, customer search/profile history and bounded analytics.
 - Lightweight polling keeps order, delivery, customer and admin views fresh without manual page refreshes.
-- Optional lightweight CSS 3D gallery with mobile/reduced-motion fallback.
 
 ## Configuration and docs
 

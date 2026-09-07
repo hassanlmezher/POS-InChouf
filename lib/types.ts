@@ -91,12 +91,11 @@ export interface Settings {
   contactEmail: string;
   contactPhone: string;
   address: string;
-  theme3d: boolean;
   paymentOptions: string[];
   categories: string[];
   currency: string;
   branding?: {
-    logoId?: string;
+    logoId: string | null;
   };
 }
 export const defaultSettings: Settings = {
@@ -105,7 +104,6 @@ export const defaultSettings: Settings = {
   contactEmail: '',
   contactPhone: '',
   address: '',
-  theme3d: false,
   paymentOptions: ['Cash on delivery'],
   categories: ['General'],
   currency: 'USD',
@@ -213,7 +211,18 @@ export const money = (cents: number) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(
     cents / 100,
   );
-export const settingsOf = (t: Tenant): Settings => ({
-  ...defaultSettings,
-  ...JSON.parse(t.settings),
-});
+export const settingsOf = (t: Tenant): Settings => {
+  const stored = JSON.parse(t.settings) as Partial<Settings>;
+  return {
+    ...defaultSettings,
+    tagline: stored.tagline ?? defaultSettings.tagline,
+    description: stored.description ?? defaultSettings.description,
+    contactEmail: stored.contactEmail ?? defaultSettings.contactEmail,
+    contactPhone: stored.contactPhone ?? defaultSettings.contactPhone,
+    address: stored.address ?? defaultSettings.address,
+    paymentOptions: stored.paymentOptions ?? defaultSettings.paymentOptions,
+    categories: stored.categories ?? defaultSettings.categories,
+    currency: stored.currency ?? defaultSettings.currency,
+    branding: stored.branding,
+  };
+};

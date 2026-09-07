@@ -11,9 +11,8 @@ Format: 16:9 website/YouTube and 9:16 social. Tone: composed, direct and optimis
 | 5 | 6s | Actual focused work queues and picker order detail | Your team knows what to pick, what to pack and what needs attention. | Pick. Check. Pack. |
 | 6 | 6s | Actual assignment and delivery controls | Assign your own driver and keep delivery moving. | Your delivery process. Your control. |
 | 7 | 6s | Actual customer private tracking page | Customers follow their order through a private tracking link. | From checkout to doorstep. |
-| 8 | 6s | Actual optional perspective gallery; show normal toggle | Use a clean storefront, with an optional three-D experience. | A little depth. Always optional. |
-| 9 | 6s | Starter plan card and feature summary | Start with one business, an owner and two employees, for twenty dollars a month. | Starter · $20 / month |
-| 10 | 6s | InChouf logo, domain and configured contact block | InChouf OrderPilot. Turn online orders into organized deliveries. | Contact Hassan · contact details pending configuration |
+| 8 | 6s | Starter plan card and feature summary | Start with one business, an owner and two employees, for twenty dollars a month. | Starter · $20 / month |
+| 9 | 6s | InChouf logo, domain and configured contact block | InChouf OrderPilot. Turn online orders into organized deliveries. | Contact Hassan · contact details pending configuration |
 
 ## Contacts
 
@@ -21,8 +20,8 @@ Read only `config/contact.ts`. If a field still starts with `CONTACT_`, do not i
 
 ## Production shot list
 
-Capture desktop storefront, checkout, POS overview, work queues, order preparation, driver assignment/delivery, private tracking and pricing. Capture the optional perspective mode separately. Avoid filming passwords or private tracking tokens in browser chrome. Use fictional data only inside the clearly labelled internal demo. A future live-action cut can show a merchant sorting paper orders; the initial screen-based version uses a typographic opening instead of pretending to have filmed a real business.
+Capture desktop storefront, checkout, POS overview, work queues, order preparation, driver assignment/delivery, private tracking and pricing. Avoid filming passwords or private tracking tokens in browser chrome. Use fictional data only inside the clearly labelled internal demo. A future live-action cut can show a merchant sorting paper orders; the initial screen-based version uses a typographic opening instead of pretending to have filmed a real business.
 
 ## Video-generation-tool prompt
 
-Create a polished 60-second SaaS product film for InChouf OrderPilot using the supplied, real application screenshots and this exact storyboard. Do not invent UI, contacts, testimonials, businesses or statistics. Use white/deep charcoal/violet, calm camera moves, crisp legible captions and clean cuts. Keep order→pick→pack→deliver→track continuity. Make both 1920×1080 and 1080×1920 versions, recompose rather than cropping critical controls. Read the supplied voiceover with a clear, measured adult voice. Include $20/month Starter and one owner plus up to two employees. The 3D shot is an optional perspective photo gallery, not a real 3D product model. Use only configured contact values from the supplied contact configuration; if absent, keep the closing contact card marked draft. Export H.264 MP4, captions, thumbnail and source project. No stock testimonials or fake revenue numbers.
+Create a polished 60-second SaaS product film for InChouf OrderPilot using the supplied, real application screenshots and this exact storyboard. Do not invent UI, contacts, testimonials, businesses or statistics. Use white/deep charcoal/violet, calm camera moves, crisp legible captions and clean cuts. Keep order→pick→pack→deliver→track continuity. Make both 1920×1080 and 1080×1920 versions, recompose rather than cropping critical controls. Read the supplied voiceover with a clear, measured adult voice. Include $20/month Starter and one owner plus up to two employees. Use only configured contact values from the supplied contact configuration; if absent, keep the closing contact card marked draft. Export H.264 MP4, captions, thumbnail and source project. No stock testimonials or fake revenue numbers.

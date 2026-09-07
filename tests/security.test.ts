@@ -397,7 +397,6 @@ void test('tenant isolation covers catalog, orders, storefronts and settings', a
       contactEmail: '',
       contactPhone: '0000000000',
       address: 'Updated address',
-      theme3d: false,
       paymentOptions: ['Cash on delivery'],
       categories: ['General'],
       currency: 'USD',
@@ -411,6 +410,14 @@ void test('tenant isolation covers catalog, orders, storefronts and settings', a
   );
   assert.deepEqual(savedSettings.branding, { logoId: 'existing-logo' });
   assert.equal(savedSettings.tagline, 'Updated storefront');
+  const publicStore = await h.request('store/internal-demo');
+  const publicStoreData = (await publicStore.json()) as {
+    tenant: { settings: string };
+  };
+  const publicSettings = JSON.parse(publicStoreData.tenant.settings);
+  assert.equal(publicSettings.contactEmail, '');
+  assert.equal(publicSettings.contactPhone, '0000000000');
+  assert.equal(publicSettings.address, 'Updated address');
   assert.equal(
     (
       await h.request(
@@ -550,6 +557,79 @@ void test('super admin business search and logo creation stay authorized and ten
     adminCookie,
   );
   assert.equal(((await cleared.json()) as { total: number }).total, 2);
+});
+
+void test('business owners can change only their own storefront logo', async () => {
+  const h = await setup();
+  const date = new Date().toISOString();
+  const logoId = 'owner-logo';
+  await h.run(
+    'INSERT INTO files (id,tenantId,name,type,size,createdAt) VALUES (?,?,?,?,?,?)',
+    logoId,
+    h.tenant,
+    'owner-logo.png',
+    'image/png',
+    8,
+    date,
+  );
+  h.blobs.set(`${h.tenant}/${logoId}`, Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10]));
+  const response = await h.request(
+    'settings',
+    'PATCH',
+    {
+      tagline: 'Logo storefront',
+      description: 'Updated description',
+      contactEmail: '',
+      contactPhone: '',
+      address: '',
+      paymentOptions: ['Cash on delivery'],
+      categories: ['General'],
+      currency: 'USD',
+      branding: { logoId },
+    },
+    h.cookie,
+  );
+  assert.equal(response.status, 200, await response.text());
+  const saved = JSON.parse(
+    (await h.get<{ settings: string }>('SELECT settings FROM tenants WHERE id=?', h.tenant))!
+      .settings,
+  );
+  assert.deepEqual(saved.branding, { logoId });
+  assert.equal((await h.request('store/internal-demo/logo')).status, 200);
+
+  await h.run(
+    'INSERT INTO tenants (id,name,slug,createdAt) VALUES (?,?,?,?)',
+    'other-logo-tenant',
+    'Other logo tenant',
+    'other-logo-tenant',
+    date,
+  );
+  await h.run(
+    'INSERT INTO files (id,tenantId,name,type,size,createdAt) VALUES (?,?,?,?,?,?)',
+    'other-logo',
+    'other-logo-tenant',
+    'other-logo.png',
+    'image/png',
+    8,
+    date,
+  );
+  const crossTenant = await h.request(
+    'settings',
+    'PATCH',
+    {
+      tagline: 'Logo storefront',
+      description: 'Updated description',
+      contactEmail: '',
+      contactPhone: '',
+      address: '',
+      paymentOptions: ['Cash on delivery'],
+      categories: ['General'],
+      currency: 'USD',
+      branding: { logoId: 'other-logo' },
+    },
+    h.cookie,
+  );
+  assert.equal(crossTenant.status, 400);
 });
 
 void test('product creation generates a tenant-unique SKU on the server', async () => {

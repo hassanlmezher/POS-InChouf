@@ -172,10 +172,13 @@ export const settingsInput = z
     contactEmail: z.union([z.email(), z.literal('')]),
     contactPhone: z.string().max(50),
     address: text,
-    theme3d: z.boolean(),
     paymentOptions: z.array(z.string().min(1).max(80)).min(1).max(5),
     categories: z.array(z.string().min(1).max(80)).max(40),
     currency: z.literal('USD'),
+    branding: z
+      .object({ logoId: z.union([id, z.null()]) })
+      .strict()
+      .optional(),
   })
   .strict();
 export async function body<T>(req: Request, schema: z.ZodType<T>): Promise<T> {

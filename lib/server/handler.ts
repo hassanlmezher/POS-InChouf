@@ -1072,12 +1072,29 @@ async function route(req: Request, env: Runtime): Promise<Response> {
         'SELECT * FROM tenants WHERE id=?',
         t,
       );
-      const branding = tenant ? settingsOf(tenant).branding : undefined;
+      const currentBranding = tenant ? settingsOf(tenant).branding : undefined;
+      const { branding: requestedBranding, ...editableSettings } = i;
+      let branding = currentBranding;
+      if (requestedBranding) {
+        if (requestedBranding.logoId !== null) {
+          const logo = await one<{ type: string }>(
+            db,
+            'SELECT type FROM files WHERE id=? AND tenantId=? AND orderId IS NULL',
+            requestedBranding.logoId,
+            t,
+          );
+          if (!logo || !logo.type.startsWith('image/'))
+            fail(400, 'Choose an image uploaded by your business.');
+          branding = { logoId: requestedBranding.logoId };
+        } else {
+          branding = undefined;
+        }
+      }
       await db.batch([
         stmt(
           db,
           'UPDATE tenants SET settings=? WHERE id=?',
-          JSON.stringify({ ...i, branding }),
+          JSON.stringify({ ...editableSettings, branding }),
           t,
         ),
         event(db, t, user.name, 'Storefront settings updated'),

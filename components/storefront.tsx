@@ -9,8 +9,9 @@ import {
   Package,
   Plus,
   Minus,
-  ArrowUpRight,
+  Sparkles,
 } from 'lucide-react';
+
 import {
   Sheet,
   SheetContent,
@@ -48,20 +49,11 @@ export default function Storefront({ slug }: { slug: string }) {
     [cart, setCart] = useState<CartLine[]>([]),
     [cartOpen, setCartOpen] = useState(false),
     [checkout, setCheckout] = useState(false),
-    [three, setThree] = useState(false),
-    [capable, setCapable] = useState(false),
     [done, setDone] = useState<{
       trackingUrl: string;
       reference: string;
       total: number;
     } | null>(null);
-  useEffect(() => {
-    setCapable(
-      matchMedia(
-        '(min-width: 900px) and (prefers-reduced-motion: no-preference) and (hover: hover)',
-      ).matches && (navigator.hardwareConcurrency || 4) >= 4,
-    );
-  }, []);
   useEffect(() => {
     const ctx = (
       document as unknown as {
@@ -195,87 +187,49 @@ export default function Storefront({ slug }: { slug: string }) {
         </button>
       </header>
       <main>
-        <section
-          className={'store-hero ' + (three && capable ? 'experience' : '')}
-        >
+        <section className="store-hero">
           <div className="store-hero-copy">
-            <div className="eyebrow">A COLLECTION FOR YOUR EVERYDAY</div>
+            <div className="eyebrow">YOUR SHOP · ONLINE</div>
             <h1>{s.tagline}</h1>
             <p>{s.description}</p>
             <a className="button" href="#collection">
-              Explore the collection <ArrowRight size={16} />
+              Browse the collection <ArrowRight size={16} />
             </a>
             <div className="store-trust">
-              <Truck size={17} />
+              <Truck size={16} />
               <span>Delivered by your shop</span>
               <span>·</span>
-              <span>Simple, private tracking</span>
+              <ShieldCheck size={16} />
+              <span>Private tracking</span>
+              <span>·</span>
+              <span>No account needed</span>
             </div>
           </div>
           <div className="store-hero-visual">
-            <div
-              className="gallery-scene"
-              onPointerMove={(e) => {
-                if (!three || !capable) return;
-                const rect = e.currentTarget.getBoundingClientRect();
-                e.currentTarget.style.setProperty(
-                  '--ry',
-                  `${((e.clientX - rect.left) / rect.width - 0.5) * 22}deg`,
-                );
-                e.currentTarget.style.setProperty(
-                  '--rx',
-                  `${-((e.clientY - rect.top) / rect.height - 0.5) * 16}deg`,
-                );
-              }}
-              onPointerLeave={(e) => {
-                e.currentTarget.style.setProperty('--ry', '-10deg');
-                e.currentTarget.style.setProperty('--rx', '4deg');
-              }}
-            >
-              {products
-                .filter((p) => p.image)
-                .slice(0, 3)
-                .map((p, i) => (
-                  <button
-                    className={`scene-product scene-${i}`}
-                    key={p.id}
-                    onClick={() => setSelected(p)}
-                    aria-label={`View ${p.name}`}
-                  >
-                    <ProductImage src={p.image} name={p.name} />
-                    <span>
-                      {p.name}
-                      <ArrowUpRight size={15} />
-                    </span>
-                  </button>
-                ))}
+            <div className="store-hero-orbs">
+              <div className="orb orb-ring" />
+              <div className="orb orb-1" />
+              <div className="orb orb-2" />
+              <div className="orb orb-3" />
+              <div className="sf-stat-pill sf-stat-pill-1">
+                <ShieldCheck size={15} />
+                Private tracking
+              </div>
+              <div className="sf-stat-pill sf-stat-pill-2">
+                <Sparkles size={15} />
+                <span>{products.length} items available</span>
+              </div>
             </div>
-            {s.theme3d && (
-              <button
-                className="experience-control"
-                onClick={() => setThree(!three)}
-                aria-pressed={three}
-              >
-                {three ? 'Standard storefront' : 'Explore the 3D Experience'}{' '}
-                <ArrowUpRight size={14} />
-              </button>
-            )}
-            {three && !capable && (
-              <p className="fallback-note">
-                Standard view is optimized for this device and your motion
-                preferences.
-              </p>
-            )}
           </div>
         </section>
         <section className="collection-section" id="collection">
           <div className="section-heading">
             <div>
-              <div className="eyebrow">FIND YOUR NEXT FAVORITE</div>
-              <h2>The collection.</h2>
+              <div className="eyebrow">BROWSE THE CATALOG</div>
+              <h2>Our products.</h2>
             </div>
             <span className="collection-count">
-              {products.length} considered essentials
+              {products.length} items
             </span>
           </div>
           <div className="store-filters">
@@ -388,14 +342,32 @@ export default function Storefront({ slug }: { slug: string }) {
           <div>
             <Package size={24} />
             <h3>Here to help.</h3>
-            {s.contactEmail && (
-              <p>
-                <a href={`mailto:${s.contactEmail}`}>{s.contactEmail}</a>
-              </p>
-            )}
-            {s.contactPhone && <p>{s.contactPhone}</p>}
-            {s.address && <p>{s.address}</p>}
-            {!s.contactPhone && !s.contactEmail && (
+            {s.contactEmail || s.contactPhone || s.address ? (
+              <div className="store-contact-list">
+                {s.contactEmail && (
+                  <p>
+                    <small>Email</small>
+                    <a href={`mailto:${s.contactEmail}`}>{s.contactEmail}</a>
+                  </p>
+                )}
+                {s.contactPhone && (
+                  <p>
+                    <small>Phone</small>
+                    <a
+                      href={`tel:${s.contactPhone.replace(/[^\d+]/g, '')}`}
+                    >
+                      {s.contactPhone}
+                    </a>
+                  </p>
+                )}
+                {s.address && (
+                  <p>
+                    <small>Address</small>
+                    <span>{s.address}</span>
+                  </p>
+                )}
+              </div>
+            ) : (
               <p>Business contact details have not been configured yet.</p>
             )}
           </div>
