@@ -8,7 +8,6 @@ import {
   type Tenant,
   type Product,
   type Variant,
-  type CustomField,
   type Zone,
   type User,
   type Order,
@@ -74,20 +73,21 @@ export async function placeOrder(
     if (variants.length && !variant)
       fail(400, 'Please choose a valid product option.');
     if (!variants.length && item.variant) fail(400, 'Invalid product option.');
-    const fields = JSON.parse(p!.customFields) as CustomField[];
+    const fields = JSON.parse(p!.customFields) as Array<{
+      name: string;
+      required: boolean;
+      type: string;
+    }>;
     for (const key of Object.keys(item.custom)) {
       if (!fields.some((f) => f.name === key))
         fail(400, 'Unknown custom field.');
     }
     for (const field of fields) {
       const value = item.custom[field.name];
+      if (field.type !== 'text')
+        fail(400, 'This product has an unsupported custom field.');
       if (field.required && !value?.trim())
         fail(400, `${field.name} is required.`);
-      if (field.type === 'file' && value)
-        fail(
-          400,
-          'Upload custom files through your private tracking page after placing the order.',
-        );
     }
     const price = variant?.price ?? p!.price;
     subtotal += price * item.quantity;
@@ -183,12 +183,6 @@ export async function orderDetail(
       tenantId,
       id,
     ),
-    proofs: await rows(
-      db,
-      'SELECT p.*, f.type AS contentType FROM proofs p JOIN files f ON f.id=p.fileId AND f.tenantId=p.tenantId WHERE p.tenantId=? AND p.orderId=? ORDER BY p.version DESC',
-      tenantId,
-      id,
-    ),
   };
 }
 export async function updateOrder(
@@ -276,9 +270,11 @@ export async function updateOrder(
     fail(400, 'Assign a driver or choose external courier before handoff.');
   const deliveryStatus =
     input.deliveryStatus ??
-    (status === 'Out for Delivery' && status !== order.status
+    (status !== order.status && status === 'Out for Delivery'
       ? 'On the way'
-      : order.deliveryStatus);
+      : status !== order.status && status === 'Delivered'
+        ? 'Delivered'
+        : order.deliveryStatus);
   if (input.employeeId !== undefined || input.driverId !== undefined)
     requireRole(user, ['owner', 'order_manager']);
   const validateDriver =
@@ -322,7 +318,9 @@ export async function updateOrder(
   if (status !== order.status)
     changes.push(`Order status: ${order.status} -> ${status}`);
   if (deliveryStatus !== order.deliveryStatus)
-    changes.push(`Delivery status: ${order.deliveryStatus} -> ${deliveryStatus}`);
+    changes.push(
+      `Delivery status: ${order.deliveryStatus} -> ${deliveryStatus}`,
+    );
   if ((order.deliveryMethod || 'internal_driver') !== deliveryMethod)
     changes.push(
       `Delivery method: ${deliveryMethodLabel(order.deliveryMethod)} -> ${deliveryMethodLabel(deliveryMethod)}`,
@@ -331,7 +329,10 @@ export async function updateOrder(
     changes.push(
       `Delivery provider: ${order.deliveryProvider || 'None'} -> ${deliveryProvider || 'None'}`,
     );
-  if (order.employeeId !== (input.employeeId === undefined ? order.employeeId : input.employeeId))
+  if (
+    order.employeeId !==
+    (input.employeeId === undefined ? order.employeeId : input.employeeId)
+  )
     changes.push(
       `Assigned employee: ${await userName(db, t, order.employeeId)} -> ${await userName(db, t, input.employeeId ?? null)}`,
     );
@@ -339,16 +340,14 @@ export async function updateOrder(
     changes.push(
       `Driver assigned: ${await userName(db, t, order.driverId)} -> ${await userName(db, t, driverId)}`,
     );
-  if (order.payment !== payment) changes.push(`Payment: ${order.payment} -> ${payment}`);
+  if (order.payment !== payment)
+    changes.push(`Payment: ${order.payment} -> ${payment}`);
   if (order.cashCollected !== cashCollected)
     changes.push(
       `Cash collected: ${(order.cashCollected / 100).toFixed(2)} -> ${(cashCollected / 100).toFixed(2)}`,
     );
   const detail =
-    changes.join('; ') ||
-    input.note ||
-    input.reason ||
-    'Order note saved';
+    changes.join('; ') || input.note || input.reason || 'Order note saved';
   const result = await db.batch([
     stmt(
       db,

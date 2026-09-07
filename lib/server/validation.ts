@@ -75,7 +75,7 @@ export const productInput = z
                 (x) => !['__proto__', 'constructor', 'prototype'].includes(x),
               ),
             required: z.boolean(),
-            type: z.enum(['text', 'file']),
+            type: z.literal('text'),
           })
           .strict(),
       )
@@ -137,9 +137,7 @@ export const updateOrderInput = z
     payment: z.enum(['Unpaid', 'Paid', 'Refunded']).optional(),
     employeeId: id.nullable().optional(),
     driverId: id.nullable().optional(),
-    deliveryMethod: z
-      .enum(['internal_driver', 'external_courier'])
-      .optional(),
+    deliveryMethod: z.enum(['internal_driver', 'external_courier']).optional(),
     deliveryProvider: z.string().trim().max(120).optional(),
     deliveryStatus: z
       .enum([

@@ -1,5 +1,4 @@
 'use client';
-import { useState } from 'react';
 import {
   CheckCircle2,
   Package,
@@ -7,15 +6,9 @@ import {
   ArrowLeft,
   ShieldCheck,
 } from 'lucide-react';
-import { useResource, api, uploadFile, message } from '@/lib/client';
-import { Loading, ErrorBox, Field, StatusBadge } from './shared';
-import {
-  type Order,
-  type Item,
-  type Proof,
-  type Event,
-  money,
-} from '@/lib/types';
+import { useResource } from '@/lib/client';
+import { Loading, ErrorBox, StatusBadge } from './shared';
+import { type Order, type Item, type Event, money } from '@/lib/types';
 export default function Tracking({
   slug,
   token,
@@ -29,12 +22,7 @@ export default function Tracking({
     order: Order;
     items: Item[];
     events: Event[];
-    proofs: Proof[];
   }>(path);
-  const [error, setError] = useState(''),
-    [feedback, setFeedback] = useState(''),
-    [busy, setBusy] = useState(false),
-    [uploaded, setUploaded] = useState('');
   if (r.loading) return <Loading />;
   if (r.error || !r.data)
     return (
@@ -46,7 +34,7 @@ export default function Tracking({
         </a>
       </main>
     );
-  const { order: o, tenant, items, events, proofs } = r.data;
+  const { order: o, tenant, items, events } = r.data;
   const flow = [
     'New',
     'Confirmed',
@@ -119,122 +107,6 @@ export default function Tracking({
           ))}
         </div>
       </div>
-      {proofs.length > 0 && (
-        <div className="panel">
-          <div className="panel-head">
-            <h3>Your custom-product proofs</h3>
-          </div>
-          <div className="panel-body">
-            {proofs.map((p, i) => (
-              <article className="proof-card" key={p.id}>
-                <div className="section-heading">
-                  <h3>Version {p.version}</h3>
-                  <StatusBadge value={p.status} />
-                </div>
-                <p>{p.note}</p>{p.contentType?.startsWith("image/")&&<img className="proof-preview" src={`/api/${path}/files/${p.fileId}`} alt={`Proof version ${p.version}`} />}
-                <a
-                  className="button secondary"
-                  href={`/api/${path}/files/${p.fileId}`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Download and review proof
-                </a>
-                {p.feedback && <p>{p.feedback}</p>}
-                {i === 0 && p.status === 'Pending' && (
-                  <>
-                    <Field label="Feedback for the shop">
-                      <textarea
-                        value={feedback}
-                        onChange={(e) => setFeedback(e.target.value)}
-                      />
-                    </Field>
-                    <div className="inline-actions">
-                      {['Approved', 'Changes requested'].map((decision) => (
-                        <button
-                          key={decision}
-                          disabled={
-                            busy ||
-                            (decision === 'Changes requested' &&
-                              !feedback.trim())
-                          }
-                          className={
-                            'button ' +
-                            (decision === 'Approved' ? '' : 'secondary')
-                          }
-                          onClick={async () => {
-                            setBusy(true);
-                            setError('');
-                            try {
-                              await api(`${path}/proofs/${p.id}`, 'POST', {
-                                decision,
-                                feedback,
-                              });
-                              await r.refresh();
-                            } catch (e) {
-                              setError(message(e));
-                            } finally {
-                              setBusy(false);
-                            }
-                          }}
-                        >
-                          {decision === 'Approved'
-                            ? 'Approve & lock this version'
-                            : 'Request changes'}
-                        </button>
-                      ))}
-                    </div>
-                    <small>
-                      Approval locks this version for preparation. Review the
-                      file before approving.
-                    </small>
-                  </>
-                )}
-              </article>
-            ))}
-          </div>
-        </div>
-      )}
-      <div className="panel">
-        <div className="panel-head">
-          <h3>Share artwork or a reference</h3>
-        </div>
-        <div className="panel-body">
-          <Field
-            label="Upload a file"
-            hint="PNG, JPEG or PDF. Maximum 5 MB. Visible only to your shop and holders of this private link."
-          >
-            <input
-              type="file"
-              accept="image/png,image/jpeg,application/pdf"
-              disabled={
-                busy ||
-                ['Cancelled', 'Returned', 'Delivered'].includes(o.status)
-              }
-              onChange={async (e) => {
-                const f = e.target.files?.[0];
-                if (!f) return;
-                setBusy(true);
-                setError('');
-                try {
-                  await uploadFile(`${path}/files`, f);
-                  setUploaded(`${f.name} was shared with the shop.`);
-                } catch (e) {
-                  setError(message(e));
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            />
-          </Field>
-          {uploaded && (
-            <div className="success-box" role="status">
-              {uploaded}
-            </div>
-          )}
-        </div>
-      </div>
-      <ErrorBox error={error} />
       <div className="panel">
         <div className="panel-head">
           <h3>Order updates</h3>
@@ -250,8 +122,8 @@ export default function Tracking({
       </div>
       <p className="private-note">
         <ShieldCheck size={16} />
-        This link is private. Anyone you share it with can view and manage
-        customer proof approvals.
+        This link is private. Anyone you share it with can view this order&apos;s
+        progress.
       </p>
       <footer className="store-footer">
         <a href="/">Powered by InChouf OrderPilot</a>

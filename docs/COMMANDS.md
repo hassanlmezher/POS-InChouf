@@ -49,7 +49,7 @@ All project commands run in `/Users/hassanmezher/Desktop/Projects/inchoufPos`. S
 - `npm test`
 - `npm run test:e2e`
 - `npx playwright test -g 'Owner catalog'`
-- `npx playwright test -g 'Custom proof'`
+- `npx playwright test -g 'Picker packing'`
 - `npm run build`
 - `git init -b main`
 - `git status --short`

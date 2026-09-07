@@ -9,7 +9,7 @@ The Worker uses Supabase's HTTP REST RPC endpoint for database calls because Clo
 ## Layout
 
 - app/: marketing, login, POS, Super Admin, storefront and private tracking routes.
-- components/: role-aware workspaces, product editor, checkout, order detail, proof and delivery interfaces.
+- components/: role-aware workspaces, product editor, checkout, order detail, tracking and delivery interfaces.
 - lib/server/handler.ts: validated HTTP dispatch and authorization.
 - lib/server/orders.ts: checkout pricing, stock reservation, state transitions and assignment validation.
 - lib/server/security.ts: session/tracking token hashing, permission checks, hostname validation and CSRF checks.
@@ -25,7 +25,7 @@ Super Admins, business owners, employees, pickers and drivers are Supabase Auth 
 
 The browser never selects the tenant for an authenticated API request. The session resolves an active profile, and that profile supplies the tenant ID. Tenant hostnames must also match the profile. Public storefront customers remain account-free and use only a revocable tracking capability.
 
-Every tenant-owned table has tenantid and is protected in two ways: all Worker queries include tenant predicates and membership/assignment checks, while PostgreSQL enables RLS policies for direct Supabase API access. Policies use auth.uid() and the profile's active tenant/role. Composite foreign keys bind order lines, zones, employee assignments, files and proofs to the same tenant. The Worker uses the server-only service role through a private HTTP RPC, so no service key reaches the client and public PostgREST access cannot bypass these policies.
+Every tenant-owned table has tenantid and is protected in two ways: all Worker queries include tenant predicates and membership/assignment checks, while PostgreSQL enables RLS policies for direct Supabase API access. Policies use auth.uid() and the profile's active tenant/role. Composite foreign keys bind order lines, zones, employee assignments and files to the same tenant. The Worker uses the server-only service role through a private HTTP RPC, so no service key reaches the client and public PostgREST access cannot bypass these policies.
 
 ## Files, delivery and order consistency
 
@@ -33,16 +33,16 @@ R2 remains private because the existing upload/download implementation already v
 
 Tenant branding uses the existing tenant settings document with a server-owned `branding.logoId`. Logos are stored in the tenant's R2 namespace and served only through a tenant-resolved storefront route; callers cannot request arbitrary logo IDs or object keys.
 
-Checkout validates catalog data, options, required text, delivery zone, minimums and payment methods on the server. Integer cents avoid floating-point totals. PostgreSQL triggers reserve stock transactionally, restore it once on cancellation/return, enforce proof scope/locking and prevent packing before proof approval. SKU, idempotency and version checks protect duplicate and concurrent writes.
+Checkout validates catalog data, options, required text, delivery zone, minimums and payment methods on the server. Integer cents avoid floating-point totals. PostgreSQL triggers reserve stock transactionally and restore it once on cancellation/return. SKU, idempotency and version checks protect duplicate and concurrent writes.
 
 Delivery supports two explicit methods. Internal delivery requires an active owner or delivery manager assigned as `driverId`; external courier delivery records `deliveryMethod=external_courier` and an optional provider without forcing an InChouf user account. Cash reconciliation is modeled as immutable settlement batches for internal drivers or external providers. Settlement rows calculate expected COD from eligible delivered orders, record actual returned cash and variance, and a unique settlement-order constraint prevents accidental double settlement.
 
-Operational views use lightweight polling rather than aggressive realtime subscriptions: order and proof queues refresh about every 15 seconds while visible, and admin/customer/audit/settlement lists refresh about every 30 seconds. Mutations still revalidate affected resources immediately after save.
+Operational views use lightweight polling rather than aggressive realtime subscriptions: order queues refresh about every 15 seconds while visible, and admin/customer/audit/settlement lists refresh about every 30 seconds. Mutations still revalidate affected resources immediately after save.
 
 ## Operational choices
 
 - Starter is one owner and up to two active employees.
 - Payment methods, COD settlements and subscription status are manual; no online payment is processed.
-- Public tracking exposes limited order data and supports account-free proof review.
+- Public tracking exposes limited order data without customer accounts.
 - The application has no required messaging, courier, marketplace or AI integration.
 - File retention and malware scanning remain operational responsibilities for production.

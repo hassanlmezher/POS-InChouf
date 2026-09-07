@@ -797,6 +797,28 @@ input.search-input {
   border-radius: 8px;
   font-size: 14px;
 }
+.toast-message {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 80;
+  max-width: min(420px, calc(100vw - 32px));
+  border-radius: 8px;
+  padding: 13px 16px;
+  box-shadow: 0 18px 45px rgba(47, 34, 67, 0.18);
+  font-size: 14px;
+  font-weight: 550;
+}
+.toast-message.success {
+  background: #edf8f0;
+  color: #3b7550;
+  border: 1px solid #cfead6;
+}
+.toast-message.error {
+  background: #fff1f2;
+  color: #9b394c;
+  border: 1px solid #f1d1d6;
+}
 .loading-state {
   display: grid;
   gap: 25px;
@@ -1144,6 +1166,61 @@ input.search-input {
   color: #8053cc;
   text-decoration: underline;
 }
+.quick-action {
+  min-width: 142px;
+}
+.row-action-group {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  position: relative;
+}
+.icon-button,
+.row-overflow summary {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid #e3dfee;
+  background: #fff;
+  display: grid;
+  place-items: center;
+  color: #5b4b6d;
+}
+.row-overflow {
+  position: relative;
+}
+.row-overflow summary {
+  list-style: none;
+  cursor: pointer;
+}
+.row-overflow summary::-webkit-details-marker {
+  display: none;
+}
+.row-overflow-menu {
+  position: absolute;
+  right: 0;
+  top: 42px;
+  z-index: 20;
+  min-width: 190px;
+  border: 1px solid #e3dfee;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 16px 38px rgba(47, 34, 67, 0.13);
+  padding: 6px;
+  display: grid;
+  gap: 4px;
+}
+.row-overflow-menu button {
+  width: 100%;
+  text-align: left;
+  border-radius: 7px;
+  padding: 9px 10px;
+  color: #4c405a;
+}
+.row-overflow-menu button:hover {
+  background: #f6f2fb;
+}
 .order-layout {
   display: grid;
   grid-template-columns: 1.6fr 1fr;
@@ -1358,14 +1435,6 @@ input.search-input {
   width: 100%;
   height: 100%;
   object-fit: contain;
-}
-.proof-card {
-  border: 1px solid #e4dbee;
-  border-radius: 8px;
-  padding: 18px;
-  margin: 14px 0;
-  display: grid;
-  gap: 10px;
 }
 .chart-bars {
   display: flex;
@@ -2124,5 +2193,3 @@ input.search-input {
 }
 
 .field-label{display:flex;flex-direction:column;gap:7px}.field-label>span{font-weight:550}
-
-.proof-preview{width:100%;max-height:350px;object-fit:contain;background:#f6f3fa;border-radius:8px}

@@ -473,12 +473,7 @@ void test('super admin business search and logo creation stay authorized and ten
       { type: 'image/png' },
     ),
   );
-  const created = await h.request(
-    'admin/tenants',
-    'POST',
-    form,
-    adminCookie,
-  );
+  const created = await h.request('admin/tenants', 'POST', form, adminCookie);
   assert.equal(created.status, 201, await created.text());
 
   const tenant = (await h.get<{ id: string; settings: string }>(
@@ -515,7 +510,12 @@ void test('super admin business search and logo creation stay authorized and ten
     adminCookie,
   );
   assert.equal(((await none.json()) as { total: number }).total, 0);
-  const cleared = await h.request('admin/tenants', 'GET', undefined, adminCookie);
+  const cleared = await h.request(
+    'admin/tenants',
+    'GET',
+    undefined,
+    adminCookie,
+  );
   assert.equal(((await cleared.json()) as { total: number }).total, 2);
 });
 
@@ -581,7 +581,12 @@ void test('customer search/profile are tenant scoped and order exports require m
   const h = await setup();
   await h.request('store/internal-demo/orders', 'POST', await checkout(h));
 
-  const customers = await h.request('customers?q=internal', 'GET', undefined, h.cookie);
+  const customers = await h.request(
+    'customers?q=internal',
+    'GET',
+    undefined,
+    h.cookie,
+  );
   const customersText = await customers.text();
   assert.equal(customers.status, 200, customersText);
   const customerRows = JSON.parse(customersText) as {
@@ -675,12 +680,10 @@ void test('packed delivery orders require explicit internal driver or external c
   );
   assert.equal(blocked.status, 400, await blocked.text());
   assert.equal(
-    (
-      await h.get<{ driverId: string | null }>(
-        'SELECT driverId FROM orders WHERE id=?',
-        externalOrder,
-      )
-    )!.driverId,
+    (await h.get<{ driverId: string | null }>(
+      'SELECT driverId FROM orders WHERE id=?',
+      externalOrder,
+    ))!.driverId,
     null,
   );
 
@@ -725,6 +728,20 @@ void test('packed delivery orders require explicit internal driver or external c
     h.cookie,
   );
   assert.equal(internal.status, 200, await internal.text());
+
+  const delivered = await h.request(
+    `orders/${internalOrder}`,
+    'PATCH',
+    { version: 4, status: 'Delivered' },
+    h.cookie,
+  );
+  const deliveredText = await delivered.text();
+  assert.equal(delivered.status, 200, deliveredText);
+  assert.equal(
+    (JSON.parse(deliveredText) as { order: { deliveryStatus: string } }).order
+      .deliveryStatus,
+    'Delivered',
+  );
 });
 
 void test('full COD cash collection marks the order paid', async () => {
@@ -748,17 +765,21 @@ void test('full COD cash collection marks the order paid', async () => {
   };
   assert.equal(detail.order.payment, 'Paid');
   assert.equal(detail.order.cashCollected, order.total);
-  assert.ok(detail.events.some((e) => e.detail.includes('Payment: Unpaid -> Paid')));
+  assert.ok(
+    detail.events.some((e) => e.detail.includes('Payment: Unpaid -> Paid')),
+  );
 });
 
 void test('cash settlements calculate variance, update balanced COD orders and prevent duplicates', async () => {
   const h = await setup();
   await createDeliveredExternalOrder(h, 'Fleet Co');
   await createDeliveredExternalOrder(h, 'Fleet Co');
-  const expected = Number((await h.get<{ total: number }>(
-    "SELECT SUM(total) total FROM orders WHERE tenantId=? AND deliveryProvider='Fleet Co'",
-    h.tenant,
-  ))!.total);
+  const expected = Number(
+    (await h.get<{ total: number }>(
+      "SELECT SUM(total) total FROM orders WHERE tenantId=? AND deliveryProvider='Fleet Co'",
+      h.tenant,
+    ))!.total,
+  );
 
   const missing = await h.request(
     'settlements',
@@ -796,10 +817,12 @@ void test('cash settlements calculate variance, update balanced COD orders and p
   );
 
   await createDeliveredExternalOrder(h, 'Balanced Co');
-  const balancedExpected = Number((await h.get<{ total: number }>(
-    "SELECT SUM(total) total FROM orders WHERE tenantId=? AND deliveryProvider='Balanced Co'",
-    h.tenant,
-  ))!.total);
+  const balancedExpected = Number(
+    (await h.get<{ total: number }>(
+      "SELECT SUM(total) total FROM orders WHERE tenantId=? AND deliveryProvider='Balanced Co'",
+      h.tenant,
+    ))!.total,
+  );
   const balanced = await h.request(
     'settlements',
     'POST',
@@ -812,12 +835,10 @@ void test('cash settlements calculate variance, update balanced COD orders and p
   );
   assert.equal(balanced.status, 201, await balanced.text());
   assert.equal(
-    (
-      await h.get<{ payment: string; cashCollected: number }>(
-        "SELECT payment,cashCollected FROM orders WHERE tenantId=? AND deliveryProvider='Balanced Co'",
-        h.tenant,
-      )
-    )!.payment,
+    (await h.get<{ payment: string; cashCollected: number }>(
+      "SELECT payment,cashCollected FROM orders WHERE tenantId=? AND deliveryProvider='Balanced Co'",
+      h.tenant,
+    ))!.payment,
     'Paid',
   );
   const pickerCookie = await cookieForRole(h, 'picker');
@@ -864,92 +885,87 @@ void test('Supabase Auth-backed login creates app sessions and enforces expiry a
   );
 });
 
-void test('proof files are tenant-scoped and approved proofs cannot be changed', async () => {
+void test('order proof and reference upload endpoints are removed', async () => {
   const h = await setup();
   const created = (await (
     await h.request('store/internal-demo/orders', 'POST', await checkout(h))
   ).json()) as { id: string; trackingUrl: string };
-  const fileId = crypto.randomUUID();
-  await h.run(
-    'INSERT INTO files (id,tenantId,orderId,name,type,size,createdAt) VALUES (?,?,?,?,?,?,?)',
-    fileId,
-    h.tenant,
-    created.id,
-    'proof.png',
-    'image/png',
-    10,
-    new Date().toISOString(),
-  );
-  assert.equal(
-    (
-      await h.request(
-        `orders/${created.id}/proofs`,
-        'POST',
-        { fileId, note: 'Review' },
-        h.cookie,
-      )
-    ).status,
-    201,
-  );
-  await h.request(
-    `orders/${created.id}`,
-    'PATCH',
-    { version: 0, status: 'Confirmed' },
-    h.cookie,
-  );
-  await h.request(
-    `orders/${created.id}`,
-    'PATCH',
-    { version: 1, status: 'Picking' },
-    h.cookie,
-  );
-  assert.equal(
-    (
-      await h.request(
-        `orders/${created.id}`,
-        'PATCH',
-        { version: 2, status: 'Packed' },
-        h.cookie,
-      )
-    ).status,
-    409,
-  );
-  const proof = (await h.get<{ id: string }>(
-    'SELECT id FROM proofs WHERE orderId=?',
-    created.id,
-  ))!;
   const tracking = created.trackingUrl.split('/').pop()!;
-  const approval = await h.request(
-    `store/internal-demo/track/${tracking}/proofs/${proof.id}`,
-    'POST',
-    { decision: 'Approved', feedback: '' },
-  );
-  assert.equal(approval.status, 200, await approval.text());
-  assert.equal(
-    (
-      await h.request(
-        `orders/${created.id}`,
-        'PATCH',
-        { version: 2, status: 'Packed' },
-        h.cookie,
-      )
-    ).status,
-    200,
-  );
-  await assert.rejects(
-    h.run("UPDATE proofs SET note='changed' WHERE id=?", proof.id),
-    /PROOF_LOCKED/,
-  );
+
   assert.equal(
     (
       await h.request(
         `orders/${created.id}/proofs`,
         'POST',
-        { fileId, note: 'Replacement' },
+        { fileId: crypto.randomUUID(), note: 'Review' },
         h.cookie,
       )
     ).status,
-    409,
+    404,
+  );
+  assert.equal(
+    (
+      await h.request(
+        `orders/${created.id}/files`,
+        'POST',
+        { unused: true },
+        h.cookie,
+      )
+    ).status,
+    404,
+  );
+  assert.equal(
+    (
+      await h.request(`store/internal-demo/track/${tracking}/files`, 'POST', {
+        unused: true,
+      })
+    ).status,
+    404,
+  );
+  assert.equal(
+    (
+      await h.request(
+        `store/internal-demo/track/${tracking}/proofs/${crypto.randomUUID()}`,
+        'POST',
+        { decision: 'Approved', feedback: '' },
+      )
+    ).status,
+    404,
+  );
+  assert.equal(
+    (await h.request('waiting-proofs', 'GET', undefined, h.cookie)).status,
+    404,
+  );
+
+  const detail = (await (
+    await h.request(`orders/${created.id}`, 'GET', undefined, h.cookie)
+  ).json()) as Record<string, unknown>;
+  assert.equal('proofs' in detail, false);
+  const trackingBody = (await (
+    await h.request(`store/internal-demo/track/${tracking}`)
+  ).json()) as Record<string, unknown>;
+  assert.equal('proofs' in trackingBody, false);
+
+  const product = (await h.get<{ id: string }>(
+    "SELECT id FROM products WHERE tenantId=? AND category='Audio' LIMIT 1",
+    h.tenant,
+  ))!;
+  await h.run(
+    'UPDATE products SET customFields=? WHERE tenantId=? AND id=?',
+    JSON.stringify([{ name: 'Artwork', required: true, type: 'file' }]),
+    h.tenant,
+    product.id,
+  );
+  assert.equal(
+    (
+      await h.request(
+        'store/internal-demo/orders',
+        'POST',
+        await checkout(h),
+        h.cookie,
+      )
+    ).status,
+    400,
   );
 });
 

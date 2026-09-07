@@ -8,7 +8,7 @@ Project: `/Users/hassanmezher/Desktop/Projects/inchoufPos`.
 - Replaced the SQLite/D1 data layer with Drizzle PostgreSQL schema and repeatable Supabase migrations, including composite tenant keys, integrity triggers and RLS policies.
 - Added Worker-safe Supabase HTTP database RPC access and Supabase Auth REST integration; retained Cloudflare R2 for private files.
 - Completed guest checkout and private customer tracking, including server-calculated prices, delivery fees, inventory reservation, duplicate-request protection and revocable links.
-- Completed image proof previews and customer approval through employee picking/packing and assigned-driver delivery.
+- Completed account-free customer tracking through employee picking/packing and assigned-driver delivery.
 - Fixed picker UI payloads so they contain only authorized fields; the server still rejects forbidden fields.
 - Fixed the nondeterministic security fixture's delivery-zone selection.
 - Fixed login hydration and accessible field labels uncovered during browser testing.
@@ -19,7 +19,7 @@ Project: `/Users/hassanmezher/Desktop/Projects/inchoufPos`.
 
 - TypeScript: pass.
 - Lint: pass.
-- Security/integration: 7 PostgreSQL/PGlite tests passed, covering tenant isolation, authorization, CSRF, sessions, inventory, tracking and proofs.
+- Security/integration: PostgreSQL/PGlite tests passed, covering tenant isolation, authorization, CSRF, sessions, inventory and tracking.
 - Browser suite: 4 end-to-end tests passed together; additional mobile POS test passed separately.
 - Responsive checks: 390×844 storefront, checkout, marketing and POS; desktop POS/admin/tracking; reduced-motion 3D fallback.
 - Production build: pass. Vinext reports its known static-route classification limitation; production runtime still needs verification.

@@ -139,7 +139,7 @@ export async function seedDemo(env: Runtime, passwords: DemoCredentials) {
           2900,
           30,
           'notebook.jpg',
-          'Add a name or a short message. Proof approval is available before packing.',
+          'Add a name or a short message for a personal touch.',
         ],
         [
           'Wireless speaker',
@@ -182,10 +182,7 @@ export async function seedDemo(env: Runtime, passwords: DemoCredentials) {
           ),
           JSON.stringify(
             i === 3
-              ? [
-                  { name: 'Name on cover', required: true, type: 'text' },
-                  { name: 'Artwork', required: false, type: 'file' },
-                ]
+              ? [{ name: 'Name on cover', required: true, type: 'text' }]
               : [],
           ),
           date,

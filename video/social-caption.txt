@@ -5,7 +5,7 @@ InChouf OrderPilot brings your storefront, team and delivery process into one wo
 • Online orders and private tracking
 • Clear picking and packing queues
 • Your delivery zones and drivers
-• Optional custom-product proof approval
+• Optional custom product details at checkout
 
 Starter: $20/month for one business, one owner and up to two employees.
 

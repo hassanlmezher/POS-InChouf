@@ -16,16 +16,10 @@ Base path: `/api`. JSON requests must use `Content-Type: application/json`. Muta
 | POST       | `/admin/tenants/:id/reset`                  | Reset owner password and revoke sessions                                        |
 | GET        | `/store/:slug`                              | Active public catalog, settings and delivery zones                              |
 | POST       | `/store/:slug/orders`                       | Anonymous validated/rate-limited checkout                                       |
-| GET        | `/store/:slug/track/:token`                 | Limited order view and proof history                                            |
-| POST       | `/store/:slug/track/:token/files`           | Raw binary upload tied to this order                                            |
-| GET        | `/store/:slug/track/:token/files/:fileId`   | Authorized order file                                                           |
-| POST       | `/store/:slug/track/:token/proofs/:proofId` | Approve or request changes on latest pending proof                              |
+| GET        | `/store/:slug/track/:token`                 | Limited account-free order progress                                             |
 | GET, POST  | `/orders`                                   | Authorized list or manual checkout                                              |
 | GET, PATCH | `/orders/:id`                               | Assignment-aware detail and versioned update                                    |
 | POST       | `/orders/:id/tracking`                      | Rotate/revoke customer capability                                               |
-| GET, POST  | `/orders/:id/files`                         | List/upload order files                                                         |
-| POST       | `/orders/:id/proofs`                        | Add next proof version; locked after approval                                   |
-| GET        | `/waiting-proofs`                           | Assignment-aware work queue                                                     |
 | GET, POST  | `/products`                                 | Product permission; list/create                                                 |
 | PATCH      | `/products/:id`                             | Product permission; update                                                      |
 | GET        | `/catalog`                                  | Catalog for authorized manual orders                                            |
@@ -68,4 +62,4 @@ A successful response contains `id`, `reference`, `total`, and `trackingUrl`. Sa
 
 Order updates contain the last fetched `version` and only changed fields: `status`, `payment`, `employeeId`, `driverId`, `deliveryStatus`, `cashCollected`, `reason`, `note`. The server checks transitions, roles, assignments and version conflicts. File upload bodies are raw bytes with `X-File-Name`; they are not multipart forms.
 
-Errors: 400 validation; 401 sign-in required; 403 permission/origin/suspension; 404 inaccessible record; 409 stale version, inventory, proof or uniqueness conflict; 413 oversized upload; 429 rate limit; 500 sanitized unexpected failure. No CORS wildcard is enabled.
+Errors: 400 validation; 401 sign-in required; 403 permission/origin/suspension; 404 inaccessible record; 409 stale version, inventory or uniqueness conflict; 413 oversized upload; 429 rate limit; 500 sanitized unexpected failure. No CORS wildcard is enabled.

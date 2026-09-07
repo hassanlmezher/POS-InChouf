@@ -45,4 +45,4 @@ Set exactly these in the Cloudflare dashboard (Workers & Pages → Settings → 
 
 Do not guess DNS targets. Register the application, admin, app and supported tenant wildcard hostnames with the selected hosting service, then copy the exact CNAME/A/TXT records it returns into the DNS provider. Preserve mail and unrelated verification records.
 
-Before onboarding merchants, verify HTTPS, `/api/health`, Supabase Auth login, bootstrap removal, suspended tenants, cross-tenant reads/writes, anonymous checkout, R2 upload/download scope, tracking revocation, proof approval, and independent staff sessions on the deployed hostname. No production URL is claimed until those checks pass.
+Before onboarding merchants, verify HTTPS, `/api/health`, Supabase Auth login, bootstrap removal, suspended tenants, cross-tenant reads/writes, anonymous checkout, R2 upload/download scope, tracking revocation, order status transitions, delivery handoff, and independent staff sessions on the deployed hostname. No production URL is claimed until those checks pass.

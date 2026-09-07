@@ -118,7 +118,7 @@ export interface Variant {
 export interface CustomField {
   name: string;
   required: boolean;
-  type: 'text' | 'file';
+  type: 'text';
 }
 export interface Product {
   id: string;
@@ -204,21 +204,10 @@ export interface Settlement {
   createdBy: string;
   createdAt: string;
 }
-export interface Proof {
- contentType?: string;
-  id: string;
-  version: number;
-  fileId: string;
-  note: string;
-  status: string;
-  feedback: string;
-  createdAt: string;
-}
 export interface Detail {
   order: Order;
   items: Item[];
   events: Event[];
-  proofs: Proof[];
 }
 export const money = (cents: number) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(

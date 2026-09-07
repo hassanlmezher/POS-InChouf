@@ -211,7 +211,7 @@ export default function Home() {
               ],
               [
                 'Custom when you need it',
-                'Collect text and files, share proofs and lock approved versions.',
+                'Collect text details at checkout and keep preparation instructions with the order.',
               ],
               [
                 'An optional 3D experience',
@@ -298,7 +298,7 @@ export default function Home() {
             ],
             [
               'Is this only for custom products?',
-              'No. Standard products are the core workflow. Custom fields and proof approval are optional.',
+              'No. Standard products are the core workflow. Custom text fields are optional.',
             ],
             [
               'Can my employees use it?',

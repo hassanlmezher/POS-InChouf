@@ -267,10 +267,7 @@ export default function ProductEditor({
           </div>
         ))}
         <p>
-          <small>
-            Customers can upload artwork through their private tracking page.
-            Add proofs from the order workspace.
-          </small>
+          <small>Custom fields collect text details during checkout.</small>
         </p>
         <ErrorBox error={error} />
         <div className="form-actions">

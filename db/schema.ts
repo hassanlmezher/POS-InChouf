@@ -188,27 +188,6 @@ export const events = pgTable(
     }),
   ],
 );
-export const proofs = pgTable(
-  'proofs',
-  {
-    id: text('id').primaryKey(),
-    tenantId: text('tenantid').notNull(),
-    orderId: text('orderid').notNull(),
-    version: integer('version').notNull(),
-    fileId: text('fileid').notNull(),
-    note: text('note').notNull().default(''),
-    status: text('status').notNull().default('Pending'),
-    feedback: text('feedback').notNull().default(''),
-    createdAt: text('createdat').notNull(),
-  },
-  (t) => [
-    uniqueIndex('proof_version').on(t.tenantId, t.orderId, t.version),
-    foreignKey({
-      columns: [t.tenantId, t.orderId],
-      foreignColumns: [orders.tenantId, orders.id],
-    }),
-  ],
-);
 export const files = pgTable(
   'files',
   {

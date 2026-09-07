@@ -19,6 +19,8 @@ import {
   CheckCircle2,
   Clock,
   AlertCircle,
+  MoreVertical,
+  Loader2,
 } from 'lucide-react';
 import {
   SidebarProvider,
@@ -69,6 +71,7 @@ import {
   rolePermissions,
   roleLabels,
   statuses,
+  transitions,
   money,
   settingsOf,
 } from '@/lib/types';
@@ -151,12 +154,6 @@ const queueDefs = [
     icon: AlertCircle,
   },
   {
-    name: 'Waiting for Customer',
-    status: [],
-    description: 'Proofs awaiting customer approval.',
-    icon: Clock,
-  },
-  {
     name: 'Ready for Delivery',
     status: ['Packed'],
     description: 'Assign a driver and send it on its way.',
@@ -179,7 +176,11 @@ export default function Pos() {
     [selectedCustomer, setSelectedCustomer] = useState<string | null>(null),
     [editing, setEditing] = useState<Product | null | undefined>(undefined),
     [manual, setManual] = useState(false),
-    [error, setError] = useState('');
+    [error, setError] = useState(''),
+    [toast, setToast] = useState<{
+      kind: 'success' | 'error';
+      text: string;
+    } | null>(null);
   const user = me.data?.user,
     tenant = me.data?.tenant;
   const perms = user ? rolePermissions[user.role] : [];
@@ -189,6 +190,10 @@ export default function Pos() {
     ),
     products = useResource<Product[]>(
       user && perms.includes('products') ? 'products' : null,
+      { intervalMs: 30000 },
+    ),
+    team = useResource<User[]>(
+      user && perms.includes('orders') ? 'team' : null,
       { intervalMs: 30000 },
     );
   const audit = useResource<Event[]>(view === 'Audit log' ? 'audit' : null, {
@@ -201,23 +206,23 @@ export default function Pos() {
     { intervalMs: 30000 },
   );
   const customerProfile = useResource<CustomerProfile>(
-    selectedCustomer ? `customers/${encodeURIComponent(selectedCustomer)}` : null,
+    selectedCustomer
+      ? `customers/${encodeURIComponent(selectedCustomer)}`
+      : null,
     { intervalMs: 30000 },
-  );
-  const proofQueue = useResource<{ orderId: string }[]>(
-    user && perms.includes('orders') ? 'waiting-proofs' : null,
-    { intervalMs: 15000 },
   );
   const settlements = useResource<{
     settlements: Settlement[];
     orders: SettlementOrder[];
-  }>(
-    view === 'Delivery' && user?.role === 'owner' ? 'settlements' : null,
-    { intervalMs: 30000 },
-  );
+  }>(view === 'Delivery' && user?.role === 'owner' ? 'settlements' : null, {
+    intervalMs: 30000,
+  });
   const csvRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 250);
+    const timer = window.setTimeout(
+      () => setDebouncedSearch(search.trim()),
+      250,
+    );
     return () => window.clearTimeout(timer);
   }, [search]);
   useEffect(() => {
@@ -226,22 +231,24 @@ export default function Pos() {
     if (user?.role === 'picker') setView('Work queues');
     if (user?.role === 'delivery_manager') setView('Delivery');
   }, [user?.role]);
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(null), 3500);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
   const all = orders.data || [];
   const refresh = () => {
     void orders.refresh();
     void products.refresh();
-    void proofQueue.refresh();
+    void team.refresh();
   };
-  const pending = new Set(proofQueue.data?.map((p) => p.orderId) || []);
   const visible = all.filter(
     (o) =>
       (view !== 'Delivery' ||
         ['Packed', 'Out for Delivery', 'Failed Delivery', 'Returned'].includes(
           o.status,
         )) &&
-      (filter === 'All orders' ||
-        o.status === filter ||
-        (filter === 'Waiting for Customer' && pending.has(o.id))) &&
+      (filter === 'All orders' || o.status === filter) &&
       `${o.reference} ${o.customer} ${o.phone}`
         .toLowerCase()
         .includes(search.toLowerCase()),
@@ -463,6 +470,10 @@ export default function Pos() {
                       )
                       .slice(0, 5)}
                     select={setSelected}
+                    user={user}
+                    team={team.data || []}
+                    onSaved={refresh}
+                    notify={setToast}
                   />
                 </div>
                 <div className="panel">
@@ -519,11 +530,7 @@ export default function Pos() {
                   <div className="panel-body">
                     <div className="metric" style={{ border: 0, padding: 0 }}>
                       <span>Pending cash on delivery</span>
-                      <strong>
-                        {money(
-                          codExpected,
-                        )}
-                      </strong>
+                      <strong>{money(codExpected)}</strong>
                       <small>Order total less recorded cash collected</small>
                     </div>
                   </div>
@@ -591,7 +598,14 @@ export default function Pos() {
                 <small>{visible.length} orders · latest 500</small>
               </div>
               <div className="panel">
-                <OrderTable orders={visible} select={setSelected} />
+                <OrderTable
+                  orders={visible}
+                  select={setSelected}
+                  user={user}
+                  team={team.data || []}
+                  onSaved={refresh}
+                  notify={setToast}
+                />
               </div>
               {view === 'Delivery' && user.role === 'owner' && (
                 <SettlementPanel
@@ -623,11 +637,7 @@ export default function Pos() {
                     key={q.name}
                     onClick={() => {
                       go('Orders');
-                      setFilter(
-                        q.name === 'Waiting for Customer'
-                          ? q.name
-                          : q.status[0],
-                      );
+                      setFilter(q.status[0]);
                       if (q.name === 'Delivery Exceptions') {
                         setFilter('Failed Delivery');
                       }
@@ -635,9 +645,7 @@ export default function Pos() {
                   >
                     <q.icon className="queue-icon" size={22} />
                     <strong>
-                      {q.name === 'Waiting for Customer'
-                        ? pending.size
-                        : all.filter((o) => q.status.includes(o.status)).length}
+                      {all.filter((o) => q.status.includes(o.status)).length}
                     </strong>
                     <h3>{q.name}</h3>
                     <p>{q.description}</p>
@@ -906,19 +914,14 @@ export default function Pos() {
               </div>
               <div className="metric-grid">
                 {[
-                  [
-                    'Delivered order value',
-                    money(deliveredValue),
-                  ],
+                  ['Delivered order value', money(deliveredValue)],
                   ['Paid revenue', money(paidRevenue)],
                   ['Outstanding amount', money(outstanding)],
                   ['Cash recorded', money(cashCollected)],
                   [
                     'Average delivered order',
                     money(
-                      delivered.length
-                        ? deliveredValue / delivered.length
-                        : 0,
+                      delivered.length ? deliveredValue / delivered.length : 0,
                     ),
                   ],
                   ['Delivered orders', delivered.length],
@@ -1020,6 +1023,14 @@ export default function Pos() {
           onSaved={refresh}
         />
       )}
+      {toast && (
+        <div
+          className={`toast-message ${toast.kind}`}
+          role={toast.kind === 'error' ? 'alert' : 'status'}
+        >
+          {toast.text}
+        </div>
+      )}
       {selectedCustomer && (
         <Modal
           open
@@ -1106,10 +1117,140 @@ export default function Pos() {
 function OrderTable({
   orders,
   select,
+  user,
+  team,
+  onSaved,
+  notify,
 }: {
   orders: Order[];
   select: (id: string) => void;
+  user: User;
+  team: User[];
+  onSaved: () => void;
+  notify: (toast: { kind: 'success' | 'error'; text: string }) => void;
 }) {
+  const [busyId, setBusyId] = useState(''),
+    [handoff, setHandoff] = useState<Order | null>(null),
+    [exception, setException] = useState<{
+      order: Order;
+      label: string;
+      payload: Record<string, unknown>;
+    } | null>(null),
+    [handoffMethod, setHandoffMethod] = useState<
+      'internal_driver' | 'external_courier'
+    >('internal_driver'),
+    [handoffDriver, setHandoffDriver] = useState('none'),
+    [handoffProvider, setHandoffProvider] = useState(''),
+    [reason, setReason] = useState('');
+  const drivers = team.filter((u) =>
+    ['owner', 'delivery_manager'].includes(u.role),
+  );
+  const primary: Record<string, { label: string; status: string }> = {
+    New: { label: 'Confirm order', status: 'Confirmed' },
+    Confirmed: { label: 'Start picking', status: 'Picking' },
+    Picking: { label: 'Mark as packed', status: 'Packed' },
+    Packed: { label: 'Hand off for delivery', status: 'Out for Delivery' },
+    'Out for Delivery': { label: 'Mark delivered', status: 'Delivered' },
+  };
+  const deliveryExceptionStatus: Record<string, string> = {
+    Failed: 'Failed Delivery',
+    'Customer unavailable': 'Failed Delivery',
+    Returned: 'Returned',
+  };
+  const manager = ['owner', 'order_manager'].includes(user.role);
+  const submit = async (
+    order: Order,
+    payload: Record<string, unknown>,
+    success: string,
+  ) => {
+    setBusyId(order.id);
+    try {
+      await api(`orders/${order.id}`, 'PATCH', {
+        ...payload,
+        version: order.version,
+      });
+      onSaved();
+      notify({ kind: 'success', text: success });
+      return true;
+    } catch (e) {
+      notify({ kind: 'error', text: message(e) });
+      return false;
+    } finally {
+      setBusyId('');
+    }
+  };
+  const openHandoff = (order: Order) => {
+    setHandoff(order);
+    setHandoffMethod(order.deliveryMethod || 'internal_driver');
+    setHandoffDriver(order.driverId || 'none');
+    setHandoffProvider(order.deliveryProvider || '');
+  };
+  const handoffReady = (order: Order) =>
+    order.deliveryMethod === 'external_courier'
+      ? !!order.deliveryProvider.trim()
+      : !!order.driverId;
+  const submitPrimary = (order: Order) => {
+    const next = primary[order.status];
+    if (!next) return;
+    if (
+      user.role === 'picker' &&
+      !['Confirmed', 'Picking'].includes(order.status)
+    )
+      return;
+    if (user.role === 'delivery_manager') {
+      if (order.status === 'Packed')
+        void submit(
+          order,
+          { deliveryStatus: 'On the way' },
+          `${order.reference} is out for delivery.`,
+        );
+      if (order.status === 'Out for Delivery')
+        void submit(
+          order,
+          { deliveryStatus: 'Delivered' },
+          `${order.reference} was marked delivered.`,
+        );
+      return;
+    }
+    if (!manager && user.role !== 'picker') return;
+    if (order.status === 'Packed') {
+      if (!handoffReady(order)) {
+        openHandoff(order);
+        return;
+      }
+      void submit(
+        order,
+        {
+          status: next.status,
+          deliveryMethod: order.deliveryMethod,
+          driverId: order.deliveryMethod === 'external_courier' ? null : undefined,
+          deliveryProvider:
+            order.deliveryMethod === 'external_courier'
+              ? order.deliveryProvider
+              : '',
+        },
+        `${order.reference} is out for delivery.`,
+      );
+      return;
+    }
+    void submit(order, { status: next.status }, `${order.reference} updated.`);
+  };
+  const canUsePrimary = (order: Order) => {
+    if (!primary[order.status]) return false;
+    if (user.role === 'picker')
+      return ['Confirmed', 'Picking'].includes(order.status);
+    if (user.role === 'delivery_manager')
+      return ['Packed', 'Out for Delivery'].includes(order.status);
+    return manager;
+  };
+  const openException = (
+    order: Order,
+    label: string,
+    payload: Record<string, unknown>,
+  ) => {
+    setException({ order, label, payload });
+    setReason('');
+  };
   if (!orders.length)
     return (
       <EmptyState
@@ -1118,44 +1259,267 @@ function OrderTable({
       />
     );
   return (
-    <Table className="op-table">
-      <TableHeader>
-        <TableRow>
-          <TableHead>Order / customer</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Total</TableHead>
-          <TableHead>Payment</TableHead>
-          <TableHead />
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {orders.map((o) => (
-          <TableRow key={o.id}>
-            <TableCell>
-              <button className="row-link" onClick={() => select(o.id)}>
-                {o.reference}
-              </button>
-              <small>{o.customer}</small>
-            </TableCell>
-            <TableCell>
-              <StatusBadge value={o.status} />
-            </TableCell>
-            <TableCell>{money(o.total)}</TableCell>
-            <TableCell>
-              <StatusBadge value={o.payment} />
-            </TableCell>
-            <TableCell>
-              <button
-                aria-label={`Open ${o.reference}`}
-                onClick={() => select(o.id)}
-              >
-                <ArrowUpRight size={17} />
-              </button>
-            </TableCell>
+    <>
+      <Table className="op-table">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Order / customer</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Total</TableHead>
+            <TableHead>Payment</TableHead>
+            <TableHead>Next step</TableHead>
+            <TableHead>More</TableHead>
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody>
+          {orders.map((o) => {
+            const busy = busyId === o.id;
+            const normal = primary[o.status];
+            const statusExceptions = transitions[o.status].filter(
+              (s) =>
+                [
+                  'Cancelled',
+                  'Returned',
+                  'Needs Attention',
+                  'Failed Delivery',
+                ].includes(s) &&
+                (user.role !== 'picker' || s === 'Needs Attention') &&
+                user.role !== 'delivery_manager',
+            );
+            const deliveryExceptions = [
+              'Failed',
+              'Customer unavailable',
+              'Returned',
+            ].filter(
+              (s) =>
+                ['owner', 'delivery_manager'].includes(user.role) &&
+                transitions[o.status].includes(
+                  deliveryExceptionStatus[s] as never,
+                ),
+            );
+            return (
+              <TableRow key={o.id}>
+                <TableCell>
+                  <button className="row-link" onClick={() => select(o.id)}>
+                    {o.reference}
+                  </button>
+                  <small>{o.customer}</small>
+                </TableCell>
+                <TableCell>
+                  <StatusBadge value={o.status} />
+                </TableCell>
+                <TableCell>{money(o.total)}</TableCell>
+                <TableCell>
+                  <StatusBadge value={o.payment} />
+                </TableCell>
+                <TableCell>
+                  {canUsePrimary(o) && normal ? (
+                    <button
+                      className="button small quick-action"
+                      disabled={busy}
+                      onClick={() => submitPrimary(o)}
+                    >
+                      {busy ? (
+                        <Loader2 size={15} className="animate-spin" />
+                      ) : null}
+                      {busy ? 'Saving...' : normal.label}
+                    </button>
+                  ) : (
+                    <small>No next step</small>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <div className="row-action-group">
+                    {(statusExceptions.length > 0 ||
+                      deliveryExceptions.length > 0) && (
+                      <details className="row-overflow">
+                        <summary aria-label={`More actions for ${o.reference}`}>
+                          <MoreVertical size={17} />
+                        </summary>
+                        <div className="row-overflow-menu">
+                          {statusExceptions.map((s) => (
+                            <button
+                              key={s}
+                              disabled={busy}
+                              onClick={() => openException(o, s, { status: s })}
+                            >
+                              {s}
+                            </button>
+                          ))}
+                          {deliveryExceptions.map((s) => (
+                            <button
+                              key={s}
+                              disabled={busy}
+                              onClick={() =>
+                                openException(o, s, { deliveryStatus: s })
+                              }
+                            >
+                              {s}
+                            </button>
+                          ))}
+                        </div>
+                      </details>
+                    )}
+                    <button
+                      className="icon-button"
+                      aria-label={`Open ${o.reference}`}
+                      onClick={() => select(o.id)}
+                    >
+                      <ArrowUpRight size={17} />
+                    </button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+      {handoff && (
+        <Modal
+          open
+          title="Hand off for delivery"
+          description="Add the missing delivery detail before this order leaves."
+          onClose={() => setHandoff(null)}
+        >
+          <form
+            className="form-stack"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const provider = handoffProvider.trim();
+              if (
+                handoffMethod === 'internal_driver' &&
+                handoffDriver === 'none'
+              )
+                return;
+              if (handoffMethod === 'external_courier' && !provider) return;
+              void submit(
+                handoff,
+                handoffMethod === 'internal_driver'
+                  ? {
+                      status: 'Out for Delivery',
+                      deliveryMethod: 'internal_driver',
+                      driverId: handoffDriver,
+                      deliveryProvider: '',
+                    }
+                  : {
+                      status: 'Out for Delivery',
+                      deliveryMethod: 'external_courier',
+                      driverId: null,
+                      deliveryProvider: provider,
+                    },
+                `${handoff.reference} is out for delivery.`,
+              ).then((ok) => ok && setHandoff(null));
+            }}
+          >
+            <Choice
+              label="Delivery method"
+              value={handoffMethod}
+              onChange={(v) =>
+                setHandoffMethod(v as 'internal_driver' | 'external_courier')
+              }
+              options={[
+                { value: 'internal_driver', label: 'Internal driver' },
+                { value: 'external_courier', label: 'External courier' },
+              ]}
+            />
+            {handoffMethod === 'internal_driver' ? (
+              <Choice
+                label="Driver"
+                value={handoffDriver}
+                onChange={setHandoffDriver}
+                options={[
+                  { value: 'none', label: 'Choose a driver' },
+                  ...drivers.map((u) => ({ value: u.id, label: u.name })),
+                ]}
+              />
+            ) : (
+              <Field label="Courier company">
+                <input
+                  value={handoffProvider}
+                  maxLength={120}
+                  onChange={(e) => setHandoffProvider(e.target.value)}
+                  placeholder="Courier or delivery company"
+                />
+              </Field>
+            )}
+            {handoffMethod === 'internal_driver' && !drivers.length && (
+              <small className="danger-text">
+                Add an active delivery manager before using internal delivery.
+              </small>
+            )}
+            <div className="form-actions">
+              <button
+                className="button secondary"
+                type="button"
+                disabled={busyId === handoff.id}
+                onClick={() => setHandoff(null)}
+              >
+                Cancel
+              </button>
+              <button
+                className="button"
+                type="submit"
+                disabled={
+                  busyId === handoff.id ||
+                  (handoffMethod === 'internal_driver' &&
+                    handoffDriver === 'none') ||
+                  (handoffMethod === 'external_courier' &&
+                    !handoffProvider.trim())
+                }
+              >
+                {busyId === handoff.id ? 'Saving...' : 'Hand off'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+      {exception && (
+        <Modal
+          open
+          title={exception.label}
+          description="Add the reason for this exception."
+          onClose={() => setException(null)}
+        >
+          <form
+            className="form-stack"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!reason.trim()) return;
+              void submit(
+                exception.order,
+                { ...exception.payload, reason: reason.trim() },
+                `${exception.order.reference} updated.`,
+              ).then((ok) => ok && setException(null));
+            }}
+          >
+            <Field label="Reason">
+              <textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="Briefly explain what happened"
+              />
+            </Field>
+            <div className="form-actions">
+              <button
+                className="button secondary"
+                type="button"
+                disabled={busyId === exception.order.id}
+                onClick={() => setException(null)}
+              >
+                Cancel
+              </button>
+              <button
+                className="button"
+                type="submit"
+                disabled={busyId === exception.order.id || !reason.trim()}
+              >
+                {busyId === exception.order.id ? 'Saving...' : 'Save exception'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+    </>
   );
 }
 
@@ -1185,7 +1549,9 @@ function SettlementPanel({
     [];
   const toIso = (date: string, end = false) =>
     date
-      ? new Date(`${date}T${end ? '23:59:59.999' : '00:00:00.000'}`).toISOString()
+      ? new Date(
+          `${date}T${end ? '23:59:59.999' : '00:00:00.000'}`,
+        ).toISOString()
       : null;
   return (
     <div className="panel">
@@ -1318,11 +1684,14 @@ function SettlementPanel({
                     {money(settlement.actual)} / Difference{' '}
                     {money(settlement.variance)} ({settlement.status})
                   </p>
-                  <small>{new Date(settlement.createdAt).toLocaleString()}</small>
+                  <small>
+                    {new Date(settlement.createdAt).toLocaleString()}
+                  </small>
                   <div className="settlement-orders">
                     {lines.map((line) => (
                       <span key={line.reference}>
-                        {line.reference} · {line.customer} · {money(line.amount)}
+                        {line.reference} · {line.customer} ·{' '}
+                        {money(line.amount)}
                       </span>
                     ))}
                   </div>
@@ -1341,7 +1710,10 @@ function SettlementPanel({
   );
 }
 
-function downloadCSV(filename: string, rows: (string | number | boolean | null | undefined)[][]) {
+function downloadCSV(
+  filename: string,
+  rows: (string | number | boolean | null | undefined)[][],
+) {
   const url = URL.createObjectURL(
     new Blob([exportCSV(rows)], { type: 'text/csv;charset=utf-8' }),
   );

@@ -7,16 +7,9 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet';
-import {
-  Field,
-  Choice,
-  ErrorBox,
-  StatusBadge,
-  Loading,
-  Submit,
-} from './shared';
-import { api, useResource, uploadFile, message } from '@/lib/client';
-import { money, transitions, type Detail, type User } from '@/lib/types';
+import { Field, Choice, ErrorBox, StatusBadge, Loading } from './shared';
+import { api, useResource, message } from '@/lib/client';
+import { money, type Detail, type User } from '@/lib/types';
 export default function OrderDetail({
   id,
   user,
@@ -29,14 +22,10 @@ export default function OrderDetail({
   onSaved: () => void;
 }) {
   const r = useResource<Detail>(`orders/${id}`, { intervalMs: 10000 }),
-    team = useResource<User[]>('team'),
-    files = useResource<{ id: string; name: string }[]>(`orders/${id}/files`);
+    team = useResource<User[]>('team');
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
-    [note, setNote] = useState(''),
     [tracking, setTracking] = useState(''),
-    [proofFile, setProofFile] = useState(''),
-    [proofNote, setProofNote] = useState(''),
     [cash, setCash] = useState(''),
     [deliveryMethod, setDeliveryMethod] = useState<
       'internal_driver' | 'external_courier'
@@ -52,27 +41,17 @@ export default function OrderDetail({
     setDeliveryMethod(orderDeliveryMethod || 'internal_driver');
     setDeliveryProvider(orderDeliveryProvider || '');
   }, [orderId, orderDeliveryMethod, orderDeliveryProvider]);
-  const normalStatus: Record<string, { label: string; status: string }> = {
-    New: { label: 'Confirm order', status: 'Confirmed' },
-    Confirmed: { label: 'Start picking', status: 'Picking' },
-    Picking: { label: 'Mark as packed', status: 'Packed' },
-    Packed: { label: 'Hand off for delivery', status: 'Out for Delivery' },
-    'Out for Delivery': { label: 'Mark delivered', status: 'Delivered' },
-  };
-  const normalDelivery: Record<string, string> = {
-    Pending: 'Picked up',
-    'Picked up': 'On the way',
-    'On the way': 'Delivered',
-  };
   const save = async (data: Record<string, unknown>) => {
     if (!o) return;
     setBusy(true);
     setError('');
     try {
-      await api(`orders/${id}`, 'PATCH', { ...data, version: o.version, note });
+      await api(`orders/${id}`, 'PATCH', {
+        ...data,
+        version: o.version,
+      });
       await r.refresh();
       onSaved();
-      setNote('');
     } catch (e) {
       setError(message(e));
     } finally {
@@ -157,19 +136,9 @@ export default function OrderDetail({
                   </div>
                   <div className="panel">
                     <div className="panel-head">
-                      <h3>Next action</h3>
+                      <h3>Order configuration</h3>
                     </div>
                     <div className="panel-body form-stack">
-                      <Field
-                        label="Note or reason"
-                        hint="Required for cancellation, returns and exceptions."
-                      >
-                        <textarea
-                          value={note}
-                          onChange={(e) => setNote(e.target.value)}
-                          placeholder="Add helpful context for the team"
-                        />
-                      </Field>
                       {manager && (
                         <div className="note-block form-stack">
                           <Choice
@@ -220,112 +189,6 @@ export default function OrderDetail({
                           </button>
                         </div>
                       )}
-                      {user.role !== 'delivery_manager' &&
-                        normalStatus[o.status] &&
-                        !(
-                          user.role === 'picker' &&
-                          !['Confirmed', 'Picking'].includes(o.status)
-                        ) && (
-                          <>
-                            <button
-                              className="button"
-                              disabled={
-                                busy ||
-                                (o.status === 'Packed' &&
-                                  deliveryMethod === 'internal_driver' &&
-                                  !o.driverId)
-                              }
-                              onClick={() =>
-                                save({
-                                  status: normalStatus[o.status].status,
-                                  deliveryMethod:
-                                    o.status === 'Packed'
-                                      ? deliveryMethod
-                                      : undefined,
-                                  deliveryProvider:
-                                    o.status === 'Packed' &&
-                                    deliveryMethod === 'external_courier'
-                                      ? deliveryProvider.trim()
-                                      : undefined,
-                                  reason: note,
-                                })
-                              }
-                            >
-                              {normalStatus[o.status].label}
-                            </button>
-                            {o.status === 'Packed' &&
-                              deliveryMethod === 'internal_driver' &&
-                              !o.driverId && (
-                                <small className="danger-text">
-                                  Assign a driver or choose external courier
-                                  before handoff.
-                                </small>
-                              )}
-                          </>
-                        )}
-                      {user.role === 'delivery_manager' &&
-                        normalDelivery[o.deliveryStatus] && (
-                          <button
-                            className="button"
-                            disabled={busy}
-                            onClick={() =>
-                              save({
-                                deliveryStatus:
-                                  normalDelivery[o.deliveryStatus],
-                                reason: note,
-                              })
-                            }
-                          >
-                            {normalDelivery[o.deliveryStatus] === 'Picked up'
-                              ? 'Mark picked up'
-                              : normalDelivery[o.deliveryStatus] === 'On the way'
-                                ? 'Start delivery'
-                                : 'Mark delivered'}
-                          </button>
-                        )}
-                      <div className="inline-actions">
-                        {user.role !== 'delivery_manager' &&
-                          transitions[o.status]
-                            .filter(
-                              (s) =>
-                                s !== normalStatus[o.status]?.status &&
-                                (user.role !== 'picker' ||
-                                  [
-                                    'Picking',
-                                    'Packed',
-                                    'Needs Attention',
-                                  ].includes(s)),
-                            )
-                            .map((s) => (
-                              <button
-                                key={s}
-                                className={
-                                  'button small ' +
-                                  ([
-                                    'Cancelled',
-                                    'Returned',
-                                    'Needs Attention',
-                                    'Failed Delivery',
-                                  ].includes(s)
-                                    ? 'secondary'
-                                    : '')
-                                }
-                                disabled={busy}
-                                onClick={() =>
-                                  save(user.role === 'picker' ? {status:s} : { status: s, reason: note })
-                                }
-                              >
-                                {s}
-                              </button>
-                            ))}
-                        <button
-                          className="button secondary small"
-                          disabled={busy || !note.trim()}
-                          onClick={() => save({})}
-                        >
-                          Save note
-                        </button>
-                      </div>
                       {manager && (
                         <>
                           <Choice
@@ -369,24 +232,6 @@ export default function OrderDetail({
                       )}
                       {['owner', 'delivery_manager'].includes(user.role) && (
                         <>
-                          <div className="inline-actions">
-                            {[
-                              'Failed',
-                              'Customer unavailable',
-                              'Returned',
-                            ].map((v) => (
-                              <button
-                                key={v}
-                                className="button secondary small"
-                                disabled={busy || !note.trim()}
-                                onClick={() =>
-                                  save({ deliveryStatus: v, reason: note })
-                                }
-                              >
-                                {v}
-                              </button>
-                            ))}
-                          </div>
                           <Field
                             label={`Cash collected · recorded ${money(o.cashCollected)}`}
                           >
@@ -473,114 +318,6 @@ export default function OrderDetail({
                       </div>
                     </div>
                   )}
-                  <div className="panel">
-                    <div className="panel-head">
-                      <h3>Custom files & proofs</h3>
-                    </div>
-                    <div className="panel-body">
-                      {files.data?.map((f) => (
-                        <div key={f.id}>
-                          <a
-                            className="text-link"
-                            href={`/api/files/${f.id}`}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            {f.name} ↓
-                          </a>
-                        </div>
-                      ))}
-                      {r.data.proofs.map((p) => (
-                        <div className="proof-card" key={p.id}>
-                          <div className="section-heading">
-                            <strong>Version {p.version}</strong>
-                            <StatusBadge value={p.status} />
-                          </div>
-                          <p>{p.note}</p>{p.contentType?.startsWith("image/")&&<img className="proof-preview" src={`/api/files/${p.fileId}`} alt={`Proof version ${p.version}`} />}
-                          <a
-                            className="text-link"
-                            href={`/api/files/${p.fileId}`}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            Download proof
-                          </a>
-                          {p.feedback && <p>{p.feedback}</p>}
-                        </div>
-                      ))}
-                      {manager && (
-                        <form
-                          className="form-stack"
-                          style={{ marginTop: 20 }}
-                          onSubmit={async (e) => {
-                            e.preventDefault();
-                            setBusy(true);
-                            try {
-                              await api(`orders/${id}/proofs`, 'POST', {
-                                fileId: proofFile,
-                                note: proofNote,
-                              });
-                              setProofFile('');
-                              setProofNote('');
-                              await r.refresh();
-                              onSaved();
-                            } catch (e) {
-                              setError(message(e));
-                            } finally {
-                              setBusy(false);
-                            }
-                          }}
-                        >
-                          <Field label="Upload proof or reference file">
-                            <input
-                              type="file"
-                              accept="image/png,image/jpeg,application/pdf"
-                              onChange={async (e) => {
-                                const file = e.target.files?.[0];
-                                if (!file) return;
-                                setBusy(true);
-                                try {
-                                  const f = await uploadFile(
-                                    `orders/${id}/files`,
-                                    file,
-                                  );
-                                  setProofFile(f.id);
-                                  await files.refresh();
-                                } catch (e) {
-                                  setError(message(e));
-                                } finally {
-                                  setBusy(false);
-                                }
-                              }}
-                            />
-                          </Field>
-                          <Choice
-                            label="Proof file"
-                            value={proofFile || 'none'}
-                            onChange={(v) =>
-                              setProofFile(v === 'none' ? '' : v)
-                            }
-                            options={[
-                              { value: 'none', label: 'Select a file' },
-                              ...(files.data || []).map((f) => ({
-                                value: f.id,
-                                label: f.name,
-                              })),
-                            ]}
-                          />
-                          <Field label="Message for customer">
-                            <textarea
-                              value={proofNote}
-                              onChange={(e) => setProofNote(e.target.value)}
-                            />
-                          </Field>
-                          <Submit busy={busy || !proofFile}>
-                            Share new proof version
-                          </Submit>
-                        </form>
-                      )}
-                    </div>
-                  </div>
                   <div className="panel">
                     <div className="panel-head">
                       <h3>Activity timeline</h3>

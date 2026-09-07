@@ -88,7 +88,7 @@ const cookie = (req: Request, value: string, age: number) =>
 type UploadPayload = {
   data: Uint8Array;
   name: string;
-  type: 'image/jpeg' | 'image/png' | 'application/pdf';
+  type: 'image/jpeg' | 'image/png';
   size: number;
 };
 
@@ -110,26 +110,19 @@ function detectUploadType(data: Uint8Array) {
   return '';
 }
 
-function validateUpload(
-  data: Uint8Array,
-  name: string,
-  orderId: string | null,
-): UploadPayload {
+function validateUpload(data: Uint8Array, name: string): UploadPayload {
   if (!data.length) fail(400, 'Choose a file.');
-  if (data.length > 5 * 1024 * 1024) fail(413, 'File must be smaller than 5 MB.');
+  if (data.length > 5 * 1024 * 1024)
+    fail(413, 'File must be smaller than 5 MB.');
   const detected = detectUploadType(data);
-  if (!detected || (!orderId && detected === 'application/pdf'))
-    fail(400, 'Use a PNG or JPEG image, or a PDF for an order.');
-  const type = detected as UploadPayload['type'];
+  if (!detected || detected === 'application/pdf')
+    fail(400, 'Use a PNG or JPEG image.');
+  const type = detected as 'image/jpeg' | 'image/png';
   return { data, name: safeName(name), type, size: data.length };
 }
 
-async function filePayload(file: File, orderId: string | null) {
-  return validateUpload(
-    new Uint8Array(await file.arrayBuffer()),
-    file.name,
-    orderId,
-  );
+async function filePayload(file: File) {
+  return validateUpload(new Uint8Array(await file.arrayBuffer()), file.name);
 }
 
 async function tenantCreateBody(req: Request) {
@@ -137,7 +130,7 @@ async function tenantCreateBody(req: Request) {
     return {
       input: await body(req, tenantInput),
       logo: null as UploadPayload | null,
-  };
+    };
   const form = await req.formData();
   const field = (key: string) => {
     const value = form.get(key);
@@ -151,7 +144,8 @@ async function tenantCreateBody(req: Request) {
     password: field('password'),
   };
   const rawLogo = form.get('logo');
-  const logo = rawLogo instanceof File && rawLogo.size ? await filePayload(rawLogo, null) : null;
+  const logo =
+    rawLogo instanceof File && rawLogo.size ? await filePayload(rawLogo) : null;
   return { input: tenantInput.parse(values), logo };
 }
 export async function handle(req: Request, env: Runtime): Promise<Response> {
@@ -184,14 +178,6 @@ export async function handle(req: Request, env: Runtime): Promise<Response> {
         {
           error:
             'Stock changed. Please reduce the quantity or refresh your cart.',
-        },
-        409,
-      );
-    if (/PROOF_|FILE_SCOPE/.test(message))
-      return json(
-        {
-          error:
-            'Proof approval is required, locked, or references an invalid file.',
         },
         409,
       );
@@ -375,7 +361,7 @@ async function route(req: Request, env: Runtime): Promise<Response> {
         logoId,
       );
       if (!file) fail(404, 'Logo not found.');
-      return download(env, tenant.id, logoId, undefined, true);
+      return download(env, tenant.id, logoId, true);
     }
     if (p[2] === 'orders' && method === 'POST') {
       await rateLimit(req, db, `checkout:${tenant.id}`, 20);
@@ -420,63 +406,7 @@ async function route(req: Request, env: Runtime): Promise<Response> {
             tenant.id,
             o.id,
           ),
-          proofs: await rows(
-            db,
-            'SELECT p.id,p.version,p.fileId,p.note,p.status,p.feedback,p.createdAt,f.type AS contentType FROM proofs p JOIN files f ON f.id=p.fileId AND f.tenantId=p.tenantId WHERE p.tenantId=? AND p.orderId=? ORDER BY p.version DESC',
-            tenant.id,
-            o.id,
-          ),
         });
-      if (p[4] === 'files' && method === 'POST') {
-        await rateLimit(req, db, `upload:${tenant.id}`, 20);
-        if (['Cancelled', 'Returned', 'Delivered'].includes(o.status))
-          fail(409, 'Uploads are closed for this order.');
-        return upload(req, env, tenant.id, o.id, 'Customer');
-      }
-      if (p[4] === 'files' && p[5] && method === 'GET')
-        return download(env, tenant.id, p[5], o.id);
-      if (p[4] === 'proofs' && p[5] && method === 'POST') {
-        const input = await body(
-          req,
-          z
-            .object({
-              decision: z.enum(['Approved', 'Changes requested']),
-              feedback: z.string().max(2000),
-            })
-            .strict(),
-        );
-        const latest = await one<{ id: string; status: string }>(
-          db,
-          'SELECT id,status FROM proofs WHERE tenantId=? AND orderId=? ORDER BY version DESC LIMIT 1',
-          tenant.id,
-          o.id,
-        );
-        if (!latest || latest.id !== p[5] || latest.status !== 'Pending')
-          fail(409, 'This proof is no longer awaiting your decision.');
-        const result = await db.batch([
-          stmt(
-            db,
-            'UPDATE proofs SET status=?,feedback=? WHERE tenantId=? AND orderId=? AND id=? AND status=?',
-            input.decision,
-            input.feedback,
-            tenant.id,
-            o.id,
-            p[5],
-            'Pending',
-          ),
-          event(
-            db,
-            tenant.id,
-            'Customer',
-            `Proof ${input.decision.toLowerCase()}`,
-            o.id,
-            '',
-            true,
-          ),
-        ]);
-        if (!result[0].meta.changes) fail(409, 'This proof already changed.');
-        return json({ ok: true });
-      }
     }
     return json({ error: 'Not found.' }, 404);
   }
@@ -489,7 +419,7 @@ async function route(req: Request, env: Runtime): Promise<Response> {
       'suspended',
     );
     if (!file) fail(404, 'Image not found.');
-    return download(env, file!.tenantId, p[1], undefined, true);
+    return download(env, file!.tenantId, p[1], true);
   }
   const user = await session(req, env);
   if (p[0] === 'me' && method === 'GET')
@@ -519,11 +449,17 @@ async function route(req: Request, env: Runtime): Promise<Response> {
   if (p[0] === 'admin') {
     requireRole(user, ['super_admin']);
     if (p[1] === 'tenants' && method === 'GET') {
-      const q = (url.searchParams.get('q') || '').trim().toLowerCase().slice(0, 120);
+      const q = (url.searchParams.get('q') || '')
+        .trim()
+        .toLowerCase()
+        .slice(0, 120);
       const status = (url.searchParams.get('subscription') || '').trim();
       const plan = (url.searchParams.get('plan') || '').trim().slice(0, 50);
       const active = url.searchParams.get('active') || 'all';
-      const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit') || 25)));
+      const limit = Math.min(
+        100,
+        Math.max(1, Number(url.searchParams.get('limit') || 25)),
+      );
       const offset = Math.max(0, Number(url.searchParams.get('offset') || 0));
       const where: string[] = [];
       const args: unknown[] = [];
@@ -657,8 +593,7 @@ async function route(req: Request, env: Runtime): Promise<Response> {
           platformEvent(db, user.name, 'Business created', input.slug),
         ]);
       } catch (e) {
-        if (logoId)
-          await env.FILES.delete(`${id}/${logoId}`).catch(() => {});
+        if (logoId) await env.FILES.delete(`${id}/${logoId}`).catch(() => {});
         await auth(env)
           .deleteUser(owner.id)
           .catch(() => {});
@@ -849,60 +784,6 @@ async function route(req: Request, env: Runtime): Promise<Response> {
         trackingUrl: raw ? `/store/${tenant!.slug}/order/${raw}` : null,
       });
     }
-    if (p[1] && p[2] === 'files' && method === 'GET') {
-      await orderDetail(env, t, p[1], user);
-      return json(
-        await rows(
-          db,
-          'SELECT id,name,type,size FROM files WHERE tenantId=? AND orderId=?',
-          t,
-          p[1],
-        ),
-      );
-    }
-    if (p[1] && p[2] === 'files' && method === 'POST') {
-      requireRole(user, ['owner', 'order_manager']);
-      await orderDetail(env, t, p[1], user);
-      return upload(req, env, t, p[1], user.name);
-    }
-    if (p[1] && p[2] === 'proofs' && method === 'POST') {
-      requireRole(user, ['owner', 'order_manager']);
-      const detail = await orderDetail(env, t, p[1], user);
-      if (
-        !['New', 'Confirmed', 'Picking', 'Needs Attention'].includes(
-          detail.order!.status,
-        )
-      )
-        fail(409, 'This order is already past proof preparation.');
-      const input = await body(
-        req,
-        z.object({ fileId: z.uuid(), note: z.string().max(2000) }).strict(),
-      );
-      await db.batch([
-        stmt(
-          db,
-          'INSERT INTO proofs (id,tenantId,orderId,version,fileId,note,createdAt) SELECT ?,?,?,COALESCE(MAX(version),0)+1,?,?,? FROM proofs WHERE tenantId=? AND orderId=?',
-          uid(),
-          t,
-          p[1],
-          input.fileId,
-          input.note,
-          now(),
-          t,
-          p[1],
-        ),
-        event(
-          db,
-          t,
-          user.name,
-          'Proof ready',
-          p[1],
-          'A new proof is ready to review.',
-          true,
-        ),
-      ]);
-      return json({ ok: true }, 201);
-    }
   }
   if (p[0] === 'products') {
     allow(user, 'products');
@@ -981,8 +862,14 @@ async function route(req: Request, env: Runtime): Promise<Response> {
   }
   if (p[0] === 'catalog' && method === 'GET') {
     allow(user, 'orders');
-    const q = (url.searchParams.get('q') || '').trim().toLowerCase().slice(0, 120);
-    const limit = Math.min(100, Math.max(1, Number(url.searchParams.get('limit') || 50)));
+    const q = (url.searchParams.get('q') || '')
+      .trim()
+      .toLowerCase()
+      .slice(0, 120);
+    const limit = Math.min(
+      100,
+      Math.max(1, Number(url.searchParams.get('limit') || 50)),
+    );
     const productWhere = q
       ? 'tenantId=? AND active=1 AND (LOWER(name) LIKE ? OR LOWER(sku) LIKE ?)'
       : 'tenantId=? AND active=1';
@@ -1155,7 +1042,11 @@ async function route(req: Request, env: Runtime): Promise<Response> {
     allow(user, 'settings');
     if (method === 'PATCH') {
       const i = await body(req, settingsInput);
-      const tenant = await one<Tenant>(db, 'SELECT * FROM tenants WHERE id=?', t);
+      const tenant = await one<Tenant>(
+        db,
+        'SELECT * FROM tenants WHERE id=?',
+        t,
+      );
       const branding = tenant ? settingsOf(tenant).branding : undefined;
       await db.batch([
         stmt(
@@ -1171,7 +1062,10 @@ async function route(req: Request, env: Runtime): Promise<Response> {
   }
   if (p[0] === 'customers' && method === 'GET') {
     allow(user, 'customers');
-    const q = (url.searchParams.get('q') || '').trim().toLowerCase().slice(0, 120);
+    const q = (url.searchParams.get('q') || '')
+      .trim()
+      .toLowerCase()
+      .slice(0, 120);
     if (p[1]) {
       const phone = decodeURIComponent(p[1]);
       const summary = await one<{
@@ -1201,7 +1095,7 @@ async function route(req: Request, env: Runtime): Promise<Response> {
       });
     }
     const where = q
-      ? "tenantId=? AND (LOWER(customer) LIKE ? OR LOWER(phone) LIKE ? OR LOWER(email) LIKE ?)"
+      ? 'tenantId=? AND (LOWER(customer) LIKE ? OR LOWER(phone) LIKE ? OR LOWER(email) LIKE ?)'
       : 'tenantId=?';
     const args = q ? [t, `%${q}%`, `%${q}%`, `%${q}%`] : [t];
     return json(
@@ -1253,12 +1147,19 @@ async function route(req: Request, env: Runtime): Promise<Response> {
         'o.createdAt >= COALESCE(?, o.createdAt)',
         'o.createdAt <= COALESCE(?, o.createdAt)',
       ];
-      const args: unknown[] = [t, input.periodStart ?? null, input.periodEnd ?? null];
+      const args: unknown[] = [
+        t,
+        input.periodStart ?? null,
+        input.periodEnd ?? null,
+      ];
       if (input.method === 'internal_driver') {
         filters.push('o.deliveryMethod=?', 'o.driverId=?');
         args.push(input.method, input.driverId);
       } else {
-        filters.push('o.deliveryMethod=?', 'LOWER(o.deliveryProvider)=LOWER(?)');
+        filters.push(
+          'o.deliveryMethod=?',
+          'LOWER(o.deliveryProvider)=LOWER(?)',
+        );
         args.push(input.method, input.provider || '');
       }
       const eligible = await rows<{ id: string; total: number }>(
@@ -1266,11 +1167,13 @@ async function route(req: Request, env: Runtime): Promise<Response> {
         `SELECT o.id,o.total FROM orders o LEFT JOIN settlementorders so ON so.tenantId=o.tenantId AND so.orderId=o.id WHERE ${filters.join(' AND ')} ORDER BY o.createdAt`,
         ...args,
       );
-      if (!eligible.length) fail(409, 'No unsettled delivered COD orders match.');
+      if (!eligible.length)
+        fail(409, 'No unsettled delivered COD orders match.');
       const expected = eligible.reduce((sum, order) => sum + order.total, 0);
       const variance = input.actual - expected;
       const settlementId = uid();
-      const status = variance === 0 ? 'balanced' : variance < 0 ? 'missing' : 'extra';
+      const status =
+        variance === 0 ? 'balanced' : variance < 0 ? 'missing' : 'extra';
       await db.batch([
         stmt(
           db,
@@ -1322,22 +1225,11 @@ async function route(req: Request, env: Runtime): Promise<Response> {
           `Expected ${(expected / 100).toFixed(2)} / Returned ${(input.actual / 100).toFixed(2)} / ${status}`,
         ),
       ]);
-      return json({ id: settlementId, expected, actual: input.actual, variance, status }, 201);
+      return json(
+        { id: settlementId, expected, actual: input.actual, variance, status },
+        201,
+      );
     }
-  }
-  if (p[0] === 'waiting-proofs' && method === 'GET') {
-    allow(user, 'orders');
-    return json(
-      await rows(
-        db,
-        "SELECT DISTINCT p.orderId FROM proofs p JOIN orders o ON o.id=p.orderId AND o.tenantId=p.tenantId WHERE p.tenantId=? AND p.status='Pending' AND p.version=(SELECT MAX(version) FROM proofs p2 WHERE p2.tenantId=p.tenantId AND p2.orderId=p.orderId) AND (? != 'picker' OR o.employeeId IS NULL OR o.employeeId=?) AND (? != 'delivery_manager' OR o.driverId=?)",
-        t,
-        user.role,
-        user.id,
-        user.role,
-        user.id,
-      ),
-    );
   }
   if (p[0] === 'audit' && method === 'GET') {
     requireRole(user, ['owner']);
@@ -1350,21 +1242,19 @@ async function route(req: Request, env: Runtime): Promise<Response> {
     );
   }
   if (p[0] === 'files' && p[1] && method === 'GET') {
-    allow(user, 'orders');
-    const f = await one<{ orderId: string | null }>(
+    allow(user, 'products');
+    const f = await one<{ id: string }>(
       db,
-      'SELECT orderId FROM files WHERE tenantId=? AND id=?',
+      'SELECT id FROM files WHERE tenantId=? AND id=? AND orderId IS NULL',
       t,
       p[1],
     );
     if (!f) fail(404, 'File not found.');
-    if (f!.orderId) await orderDetail(env, t, f!.orderId, user);
-    else allow(user, 'products');
     return download(env, t, p[1]);
   }
   if (p[0] === 'files' && method === 'POST') {
     allow(user, 'products');
-    return upload(req, env, t, null, user.name);
+    return upload(req, env, t, user.name);
   }
   return json({ error: 'Not found.' }, 404);
 }
@@ -1372,7 +1262,6 @@ async function upload(
   req: Request,
   env: Runtime,
   tenantId: string,
-  orderId: string | null,
   actor: string,
 ) {
   const length = Number(req.headers.get('content-length'));
@@ -1400,7 +1289,6 @@ async function upload(
   const upload = validateUpload(
     data,
     req.headers.get('x-file-name') || 'upload',
-    orderId,
   );
   const id = uid();
   const db = database(env);
@@ -1414,34 +1302,36 @@ async function upload(
         'INSERT INTO files (id,tenantId,orderId,name,type,size,createdAt) VALUES (?,?,?,?,?,?,?)',
         id,
         tenantId,
-        orderId,
+        null,
         upload.name,
         upload.type,
         upload.size,
         now(),
       ),
-      event(db, tenantId, actor, 'File uploaded', orderId, upload.name),
+      event(db, tenantId, actor, 'File uploaded', null, upload.name),
     ]);
   } catch (e) {
     await env.FILES.delete(`${tenantId}/${id}`);
     throw e;
   }
-  return json({ id, name: upload.name, type: upload.type, size: upload.size }, 201);
+  return json(
+    { id, name: upload.name, type: upload.type, size: upload.size },
+    201,
+  );
 }
 async function download(
   env: Runtime,
   tenantId: string,
   id: string,
-  orderId?: string,
   publicImage = false,
 ) {
-  const f = await one<{ name: string; type: string; orderId: string | null }>(
+  const f = await one<{ name: string; type: string }>(
     database(env),
-    'SELECT name,type,orderId FROM files WHERE tenantId=? AND id=?',
+    'SELECT name,type FROM files WHERE tenantId=? AND id=? AND orderId IS NULL',
     tenantId,
     id,
   );
-  if (!f || (orderId && f.orderId !== orderId)) fail(404, 'File not found.');
+  if (!f) fail(404, 'File not found.');
   const object = await env.FILES.get(`${tenantId}/${id}`);
   if (!object) fail(404, 'File not found.');
   return new Response(object!.body, {

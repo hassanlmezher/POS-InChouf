@@ -170,7 +170,11 @@ export default function Storefront({ slug }: { slug: string }) {
       <header className="store-nav">
         <a href={`/store/${slug}`} className="store-brand">
           {logo ? (
-            <img className="tenant-logo" src={logo} alt={`${tenant.name} logo`} />
+            <img
+              className="tenant-logo"
+              src={logo}
+              alt={`${tenant.name} logo`}
+            />
           ) : (
             <span className="brand-mark">i</span>
           )}
@@ -324,7 +328,9 @@ export default function Storefront({ slug }: { slug: string }) {
                       <Plus size={20} />
                     </span>
                     {p.stock === 0 && (
-                      <span className="badge red stock-badge">Out of stock</span>
+                      <span className="badge red stock-badge">
+                        Out of stock
+                      </span>
                     )}
                   </button>
                   <div className="store-product-info">
@@ -431,7 +437,7 @@ export default function Storefront({ slug }: { slug: string }) {
                   </div>
                   <p>
                     Your order is in the shop’s queue. Use this private link to
-                    follow its progress and upload any artwork.
+                    follow its progress.
                   </p>
                   <a className="button" href={done.trackingUrl}>
                     Track your order <ArrowRight size={16} />
@@ -624,7 +630,11 @@ function ProductDialog({
             value={quantity}
             onChange={(e) => {
               const next = Number(e.target.value);
-              setQuantity(Number.isFinite(next) ? Math.min(Math.max(1, next), max || 1) : 1);
+              setQuantity(
+                Number.isFinite(next)
+                  ? Math.min(Math.max(1, next), max || 1)
+                  : 1,
+              );
             }}
             required
           />
@@ -649,17 +659,7 @@ function ProductDialog({
               />
             </Field>
           ))}
-        {fields.some((f) => f.type === 'file') && (
-          <small>
-            Upload artwork securely from your private tracking page after
-            placing the order.
-          </small>
-        )}
-        <button
-          className="button"
-          disabled={!validQuantity}
-          type="submit"
-        >
+        <button className="button" disabled={!validQuantity} type="submit">
           {p.stock === 0
             ? 'Out of stock'
             : `Add to bag · ${money(price * quantity)}`}
