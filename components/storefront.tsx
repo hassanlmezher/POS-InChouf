@@ -9,12 +9,7 @@ import {
   Package,
   Plus,
   Minus,
-  Heart,
-  User,
   ChevronDown,
-  Mail,
-  MessageCircle,
-  Menu,
 } from 'lucide-react';
 import {
   Sheet,
@@ -231,9 +226,6 @@ export default function Storefront({ slug }: { slug: string }) {
                 <span className="nav-cart-badge">{count}</span>
               )}
             </button>
-            <div className="nav-icon-btn" aria-hidden="true">
-              <User size={18} />
-            </div>
           </div>
 
           {/* Mobile actions */}
@@ -250,9 +242,6 @@ export default function Storefront({ slug }: { slug: string }) {
               {count > 0 && (
                 <span className="nav-cart-badge">{count}</span>
               )}
-            </button>
-            <button className="nav-icon-btn" aria-label="Menu">
-              <Menu size={19} />
             </button>
           </div>
         </div>
@@ -318,15 +307,6 @@ export default function Storefront({ slug }: { slug: string }) {
               <p className="sf-eyebrow">SHOP BY CATEGORY</p>
               <h2 className="sf-section-title">The collection.</h2>
             </div>
-            <button
-              className="sf-view-all"
-              onClick={() => {
-                setCategory('All products');
-                setSearch('');
-              }}
-            >
-              View all categories <ArrowRight size={13} />
-            </button>
           </div>
           <div className="filter-pills">
             {categories.map((c) => (
@@ -389,14 +369,6 @@ export default function Storefront({ slug }: { slug: string }) {
                     }}
                   >
                     <ProductImage src={p.image} name={p.name} />
-                    <button
-                      className="product-wishlist"
-                      aria-label="Save to wishlist"
-                      onClick={(e) => e.stopPropagation()}
-                      tabIndex={-1}
-                    >
-                      <Heart size={14} />
-                    </button>
                     {JSON.parse(p.customFields).length > 0 && (
                       <span className="badge violet custom-badge">
                         Make it yours
@@ -511,63 +483,6 @@ export default function Storefront({ slug }: { slug: string }) {
           </div>
         </section>
       </main>
-
-      {/* ===== FOOTER ===== */}
-      <footer className="store-footer">
-        <div className="store-footer-inner">
-          <div className="footer-brand-col">
-            <a href={`/store/${slug}`} className="footer-brand">
-              {logo ? (
-                <img
-                  className="tenant-logo"
-                  src={logo}
-                  alt={`${tenant.name} logo`}
-                />
-              ) : (
-                <span className="brand-mark">i</span>
-              )}
-              {slug === 'internal-demo' ? 'The Demo Collection' : tenant.name}
-            </a>
-            <p className="footer-tagline">
-              {s.tagline || `${tenant.name}'s store`}
-            </p>
-          </div>
-          <div className="footer-links-col">
-            <a href="#collection" className="footer-nav-link">
-              The collection <ArrowRight size={12} />
-            </a>
-            <a href="#store-info" className="footer-nav-link">
-              Delivery &amp; contact <ArrowRight size={12} />
-            </a>
-          </div>
-          <div className="footer-social-col">
-            {s.contactPhone && (
-              <a
-                href={`https://wa.me/${s.contactPhone.replace(/[^\d]/g, '')}`}
-                className="footer-social-icon"
-                aria-label="WhatsApp"
-              >
-                <MessageCircle size={16} />
-              </a>
-            )}
-            {s.contactEmail && (
-              <a
-                href={`mailto:${s.contactEmail}`}
-                className="footer-social-icon"
-                aria-label="Email"
-              >
-                <Mail size={16} />
-              </a>
-            )}
-          </div>
-        </div>
-        <div className="store-footer-bottom">
-          <span>
-            © {new Date().getFullYear()} {tenant.name}. All rights reserved.
-          </span>
-          <a href="/">Powered by InChouf OrderPilot ↗</a>
-        </div>
-      </footer>
 
       {/* ===== PRODUCT DIALOG ===== */}
       {selected && (
