@@ -373,7 +373,20 @@ export default function Storefront({ slug }: { slug: string }) {
                 <article className="store-product" key={p.id}>
                   <div
                     className={`store-product-photo${p.stock === 0 ? ' disabled' : ''}`}
+                    role="button"
+                    tabIndex={p.stock > 0 ? 0 : -1}
+                    aria-disabled={p.stock === 0}
+                    aria-label={`View ${p.name}`}
                     onClick={() => p.stock > 0 && setSelected(p)}
+                    onKeyDown={(e) => {
+                      if (
+                        p.stock > 0 &&
+                        (e.key === 'Enter' || e.key === ' ')
+                      ) {
+                        e.preventDefault();
+                        setSelected(p);
+                      }
+                    }}
                   >
                     <ProductImage src={p.image} name={p.name} />
                     <button
