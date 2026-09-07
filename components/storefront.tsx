@@ -9,9 +9,13 @@ import {
   Package,
   Plus,
   Minus,
-  Sparkles,
+  Heart,
+  User,
+  ChevronDown,
+  Mail,
+  MessageCircle,
+  Menu,
 } from 'lucide-react';
-
 import {
   Sheet,
   SheetContent,
@@ -39,6 +43,7 @@ import {
   settingsOf,
   money,
 } from '@/lib/types';
+
 export default function Storefront({ slug }: { slug: string }) {
   const r = useResource<{ tenant: Tenant; products: Product[]; zones: Zone[] }>(
     `store/${slug}`,
@@ -54,6 +59,7 @@ export default function Storefront({ slug }: { slug: string }) {
       reference: string;
       total: number;
     } | null>(null);
+
   useEffect(() => {
     const ctx = (
       document as unknown as {
@@ -96,6 +102,7 @@ export default function Storefront({ slug }: { slug: string }) {
     } catch {}
     return () => controller.abort();
   }, []);
+
   if (r.loading) return <Loading />;
   if (r.error || !r.data)
     return (
@@ -107,6 +114,7 @@ export default function Storefront({ slug }: { slug: string }) {
         </a>
       </main>
     );
+
   const { tenant, products, zones } = r.data,
     s = settingsOf(tenant),
     logo = s.branding?.logoId ? `/api/store/${slug}/logo` : '',
@@ -117,6 +125,7 @@ export default function Storefront({ slug }: { slug: string }) {
           .toLowerCase()
           .includes(search.toLowerCase()),
     );
+
   const count = cart.reduce((s, l) => s + l.quantity, 0);
   const priceOf = (l: CartLine) => {
     const p = products.find((p) => p.id === l.productId)!;
@@ -152,6 +161,19 @@ export default function Storefront({ slug }: { slug: string }) {
     setSelected(null);
     setCartOpen(true);
   };
+
+  // Split tagline into two visual lines (at first '. ')
+  const taglineRaw = s.tagline || tenant.name;
+  const splitIdx = taglineRaw.indexOf('. ');
+  const tagline1 =
+    splitIdx > -1 ? taglineRaw.substring(0, splitIdx + 1) : taglineRaw;
+  const tagline2 = splitIdx > -1 ? taglineRaw.substring(splitIdx + 2) : '';
+
+  const categories = [
+    'All products',
+    ...new Set([...s.categories, ...products.map((p) => p.category)]),
+  ];
+
   return (
     <div className="store-page">
       {slug === 'internal-demo' && (
@@ -159,144 +181,236 @@ export default function Storefront({ slug }: { slug: string }) {
           INTERNAL DEMO · Sample products, no real purchases or deliveries.
         </div>
       )}
+
+      {/* ===== NAV ===== */}
       <header className="store-nav">
-        <a href={`/store/${slug}`} className="store-brand">
-          {logo ? (
-            <img
-              className="tenant-logo"
-              src={logo}
-              alt={`${tenant.name} logo`}
-            />
-          ) : (
-            <span className="brand-mark">i</span>
-          )}
-          {slug === 'internal-demo' ? 'The Demo Collection' : tenant.name}
-        </a>
-        <div className="store-nav-links">
-          <a href="#collection">The collection</a>
-          <a href="#store-info">Delivery & contact</a>
-        </div>
-        <button
-          className="button secondary"
-          onClick={() => setCartOpen(true)}
-          aria-label={`Open bag, ${count} items`}
-        >
-          <ShoppingBag size={18} />
-          <span>Bag</span>
-          <span className="cart-count">{count}</span>
-        </button>
-      </header>
-      <main>
-        <section className="store-hero">
-          <div className="store-hero-copy">
-            <div className="eyebrow">YOUR SHOP · ONLINE</div>
-            <h1>{s.tagline}</h1>
-            <p>{s.description}</p>
-            <a className="button" href="#collection">
-              Browse the collection <ArrowRight size={16} />
+        <div className="store-nav-inner">
+          <a href={`/store/${slug}`} className="store-brand">
+            {logo ? (
+              <img
+                className="tenant-logo"
+                src={logo}
+                alt={`${tenant.name} logo`}
+              />
+            ) : (
+              <span className="brand-mark">i</span>
+            )}
+            {slug === 'internal-demo' ? 'The Demo Collection' : tenant.name}
+          </a>
+
+          <nav className="store-nav-links">
+            <a href={`/store/${slug}`} className="nav-link nav-link-active">
+              Home
             </a>
-            <div className="store-trust">
-              <Truck size={16} />
-              <span>Delivered by your shop</span>
-              <span>·</span>
-              <ShieldCheck size={16} />
-              <span>Private tracking</span>
-              <span>·</span>
-              <span>No account needed</span>
+            <a href="#collection" className="nav-link">
+              The collection
+            </a>
+            <a href="#store-info" className="nav-link">
+              Delivery &amp; contact
+            </a>
+          </nav>
+
+          <div className="store-nav-search">
+            <Search size={14} />
+            <input
+              placeholder="Search products..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              aria-label="Search products"
+            />
+          </div>
+
+          <div className="store-nav-actions">
+            <button
+              className="nav-icon-btn"
+              onClick={() => setCartOpen(true)}
+              aria-label={`Open cart, ${count} items`}
+            >
+              <ShoppingBag size={18} />
+              {count > 0 && (
+                <span className="nav-cart-badge">{count}</span>
+              )}
+            </button>
+            <div className="nav-icon-btn" aria-hidden="true">
+              <User size={18} />
             </div>
           </div>
-          <div className="store-hero-visual">
-            <div className="store-hero-orbs">
-              <div className="orb orb-ring" />
-              <div className="orb orb-1" />
-              <div className="orb orb-2" />
-              <div className="orb orb-3" />
-              <div className="sf-stat-pill sf-stat-pill-1">
-                <ShieldCheck size={15} />
-                Private tracking
+
+          {/* Mobile actions */}
+          <div className="store-nav-mobile-actions">
+            <button className="nav-icon-btn" aria-label="Search">
+              <Search size={19} />
+            </button>
+            <button
+              className="nav-icon-btn"
+              onClick={() => setCartOpen(true)}
+              aria-label={`Open cart, ${count} items`}
+            >
+              <ShoppingBag size={19} />
+              {count > 0 && (
+                <span className="nav-cart-badge">{count}</span>
+              )}
+            </button>
+            <button className="nav-icon-btn" aria-label="Menu">
+              <Menu size={19} />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main>
+        {/* ===== HERO ===== */}
+        <section className="store-hero">
+          <div className="store-hero-inner">
+            {/* Left: main copy */}
+            <div className="store-hero-left">
+              <p className="sf-eyebrow">YOUR SHOP · ONLINE</p>
+              <h1 className="hero-title">
+                <span>{tagline1}</span>
+                {tagline2 && (
+                  <span className="sf-highlight">
+                    <br />
+                    {tagline2}
+                  </span>
+                )}
+              </h1>
+              <p className="hero-desc">
+                {s.description ||
+                  'Explore our curated collection and order directly from our shop. Simple, fast, and private.'}
+              </p>
+              <div className="hero-actions">
+                <a className="hero-btn-primary" href="#collection">
+                  Browse the collection <ArrowRight size={14} />
+                </a>
+                <a className="hero-btn-secondary" href="#store-info">
+                  Learn more
+                </a>
               </div>
-              <div className="sf-stat-pill sf-stat-pill-2">
-                <Sparkles size={15} />
-                <span>{products.length} items available</span>
+            </div>
+
+            {/* Right: blob + secondary panel */}
+            <div className="store-hero-right" aria-hidden="true">
+              <div className="hero-blob">
+                <div className="hero-blob-s1" />
+                <div className="hero-blob-s2" />
+              </div>
+              <div className="hero-secondary-panel">
+                <p className="sf-eyebrow">EVERYDAY ESSENTIALS</p>
+                <h2 className="hero-panel-title">
+                  Good Things
+                  <br />
+                  <span className="sf-highlight">Find You.</span>
+                </h2>
+                <div className="hero-panel-rule" />
+                <p className="hero-panel-sub">
+                  Quality products.
+                  <br />A simpler way to shop.
+                </p>
               </div>
             </div>
           </div>
         </section>
-        <section className="collection-section" id="collection">
-          <div className="section-heading">
+
+        {/* ===== CATEGORIES ===== */}
+        <section className="sf-categories" id="collection">
+          <div className="sf-section-header">
             <div>
-              <div className="eyebrow">BROWSE THE CATALOG</div>
-              <h2>Our products.</h2>
+              <p className="sf-eyebrow">SHOP BY CATEGORY</p>
+              <h2 className="sf-section-title">The collection.</h2>
             </div>
-            <span className="collection-count">
-              {products.length} items
-            </span>
+            <button
+              className="sf-view-all"
+              onClick={() => {
+                setCategory('All products');
+                setSearch('');
+              }}
+            >
+              View all categories <ArrowRight size={13} />
+            </button>
           </div>
-          <div className="store-filters">
-            <div className="filter-pills">
-              {[
-                'All products',
-                ...new Set([
-                  ...s.categories,
-                  ...products.map((p) => p.category),
-                ]),
-              ].map((c) => (
-                <button
-                  className={category === c ? 'active' : ''}
-                  key={c}
-                  onClick={() => setCategory(c)}
-                >
-                  {c}
-                </button>
-              ))}
+          <div className="filter-pills">
+            {categories.map((c) => (
+              <button
+                key={c}
+                className={category === c ? 'active' : ''}
+                onClick={() => setCategory(c)}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        {/* ===== PRODUCTS ===== */}
+        <section className="sf-products">
+          <div className="sf-products-header">
+            <div>
+              <p className="sf-eyebrow">FEATURED PRODUCTS</p>
+              <h2 className="sf-section-title">Our products.</h2>
             </div>
-            <div className="search-wrap">
-              <Search />
-              <input
-                className="search-input"
-                aria-label="Search collection"
-                placeholder="Search the collection"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+            <div className="sf-products-controls">
+              <div className="sf-search-wrap">
+                <Search size={14} />
+                <input
+                  className="sf-search-input"
+                  aria-label="Search collection"
+                  placeholder="Search the collection..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+              <div className="sf-sort-wrap">
+                <span>Sort by</span>
+                <strong>Featured</strong>
+                <ChevronDown size={13} />
+              </div>
             </div>
           </div>
+
           {filtered.length ? (
             <div className="store-product-grid">
               {filtered.map((p) => (
                 <article className="store-product" key={p.id}>
-                  <button
-                    className={
-                      'store-product-photo ' + (p.stock === 0 ? 'disabled' : '')
-                    }
-                    onClick={() => setSelected(p)}
-                    aria-label={`View ${p.name}`}
+                  <div
+                    className={`store-product-photo${p.stock === 0 ? ' disabled' : ''}`}
+                    onClick={() => p.stock > 0 && setSelected(p)}
                   >
                     <ProductImage src={p.image} name={p.name} />
+                    <button
+                      className="product-wishlist"
+                      aria-label="Save to wishlist"
+                      onClick={(e) => e.stopPropagation()}
+                      tabIndex={-1}
+                    >
+                      <Heart size={14} />
+                    </button>
                     {JSON.parse(p.customFields).length > 0 && (
                       <span className="badge violet custom-badge">
                         Make it yours
                       </span>
                     )}
-                    <span className="product-open">
-                      <Plus size={20} />
-                    </span>
                     {p.stock === 0 && (
                       <span className="badge red stock-badge">
                         Out of stock
                       </span>
                     )}
-                  </button>
-                  <div className="store-product-info">
-                    <div>
-                      <small>{p.category}</small>
-                      <h3>
-                        <button onClick={() => setSelected(p)}>{p.name}</button>
-                      </h3>
-                    </div>
+                  </div>
+                  <div className="store-product-meta">
+                    <small>{p.category}</small>
                     <strong>{money(p.price)}</strong>
                   </div>
-                  {p.stock === 0 && <small>Out of stock</small>}
+                  <h3 className="store-product-name">
+                    <button onClick={() => setSelected(p)}>{p.name}</button>
+                  </h3>
+                  <button
+                    className="add-to-bag-btn"
+                    onClick={() => setSelected(p)}
+                    disabled={p.stock === 0}
+                    aria-label={`Add ${p.name} to bag`}
+                  >
+                    <ShoppingBag size={13} />
+                    {p.stock === 0 ? 'Out of stock' : 'Add to bag'}
+                  </button>
                 </article>
               ))}
             </div>
@@ -318,9 +432,22 @@ export default function Storefront({ slug }: { slug: string }) {
             />
           )}
         </section>
+
+        {/* ===== CTA BANNER ===== */}
+        <div className="sf-cta-banner">
+          <div>
+            <p className="sf-eyebrow">A BETTER WAY TO SHOP</p>
+            <h2 className="sf-cta-title">Simple. Fast. Private.</h2>
+          </div>
+          <a href="#collection" className="sf-cta-arrow" aria-label="Browse">
+            <ArrowRight size={20} />
+          </a>
+        </div>
+
+        {/* ===== STORE INFO ===== */}
         <section className="store-info" id="store-info">
           <div>
-            <Truck size={24} />
+            <Truck size={22} />
             <h3>Delivery that stays personal.</h3>
             {zones.map((z) => (
               <p key={z.id}>
@@ -332,7 +459,7 @@ export default function Storefront({ slug }: { slug: string }) {
             ))}
           </div>
           <div>
-            <ShieldCheck size={24} />
+            <ShieldCheck size={22} />
             <h3>Shop directly. Track privately.</h3>
             <p>
               No account needed. Your order comes with a private tracking link.
@@ -340,7 +467,7 @@ export default function Storefront({ slug }: { slug: string }) {
             </p>
           </div>
           <div>
-            <Package size={24} />
+            <Package size={22} />
             <h3>Here to help.</h3>
             {s.contactEmail || s.contactPhone || s.address ? (
               <div className="store-contact-list">
@@ -353,9 +480,7 @@ export default function Storefront({ slug }: { slug: string }) {
                 {s.contactPhone && (
                   <p>
                     <small>Phone</small>
-                    <a
-                      href={`tel:${s.contactPhone.replace(/[^\d+]/g, '')}`}
-                    >
+                    <a href={`tel:${s.contactPhone.replace(/[^\d+]/g, '')}`}>
                       {s.contactPhone}
                     </a>
                   </p>
@@ -373,10 +498,65 @@ export default function Storefront({ slug }: { slug: string }) {
           </div>
         </section>
       </main>
+
+      {/* ===== FOOTER ===== */}
       <footer className="store-footer">
-        <span>{tenant.name}</span>
-        <a href="/">Powered by InChouf OrderPilot ↗</a>
+        <div className="store-footer-inner">
+          <div className="footer-brand-col">
+            <a href={`/store/${slug}`} className="footer-brand">
+              {logo ? (
+                <img
+                  className="tenant-logo"
+                  src={logo}
+                  alt={`${tenant.name} logo`}
+                />
+              ) : (
+                <span className="brand-mark">i</span>
+              )}
+              {slug === 'internal-demo' ? 'The Demo Collection' : tenant.name}
+            </a>
+            <p className="footer-tagline">
+              {s.tagline || `${tenant.name}'s store`}
+            </p>
+          </div>
+          <div className="footer-links-col">
+            <a href="#collection" className="footer-nav-link">
+              The collection <ArrowRight size={12} />
+            </a>
+            <a href="#store-info" className="footer-nav-link">
+              Delivery &amp; contact <ArrowRight size={12} />
+            </a>
+          </div>
+          <div className="footer-social-col">
+            {s.contactPhone && (
+              <a
+                href={`https://wa.me/${s.contactPhone.replace(/[^\d]/g, '')}`}
+                className="footer-social-icon"
+                aria-label="WhatsApp"
+              >
+                <MessageCircle size={16} />
+              </a>
+            )}
+            {s.contactEmail && (
+              <a
+                href={`mailto:${s.contactEmail}`}
+                className="footer-social-icon"
+                aria-label="Email"
+              >
+                <Mail size={16} />
+              </a>
+            )}
+          </div>
+        </div>
+        <div className="store-footer-bottom">
+          <span>
+            © {new Date().getFullYear()} {tenant.name}. All rights reserved.
+          </span>
+          <a href="/">Powered by InChouf OrderPilot ↗</a>
+        </div>
       </footer>
+
+      {/* ===== PRODUCT DIALOG ===== */}
       {selected && (
         <ProductDialog
           product={selected}
@@ -384,6 +564,8 @@ export default function Storefront({ slug }: { slug: string }) {
           add={add}
         />
       )}
+
+      {/* ===== CART SHEET ===== */}
       <Sheet open={cartOpen} onOpenChange={setCartOpen}>
         <SheetContent className="details-sheet">
           <div className="sheet-inner">
@@ -408,8 +590,8 @@ export default function Storefront({ slug }: { slug: string }) {
                     {done.reference} · {money(done.total)}
                   </div>
                   <p>
-                    Your order is in the shop’s queue. Use this private link to
-                    follow its progress.
+                    Your order is in the shop&apos;s queue. Use this private
+                    link to follow its progress.
                   </p>
                   <a className="button" href={done.trackingUrl}>
                     Track your order <ArrowRight size={16} />
@@ -550,6 +732,7 @@ export default function Storefront({ slug }: { slug: string }) {
     </div>
   );
 }
+
 function ProductDialog({
   product: p,
   onClose,

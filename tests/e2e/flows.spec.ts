@@ -77,7 +77,6 @@ test('Owner catalog, role-specific workspace and admin controls', async ({
   await page
     .getByLabel('Product name', { exact: true })
     .fill('Internal E2E test product');
-  await page.getByLabel('SKU', { exact: true }).fill(`E2E-${Date.now()}`);
   await page.getByLabel('Price ($)', { exact: true }).fill('15');
   await page.getByLabel('Stock quantity', { exact: true }).fill('10');
   await page.getByRole('button', { name: 'Save changes', exact: true }).click();

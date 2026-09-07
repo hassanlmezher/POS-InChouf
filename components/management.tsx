@@ -73,19 +73,21 @@ export function Zones() {
             <TableBody>
               {r.data.map((z) => (
                 <TableRow key={z.id}>
-                  <TableCell>
+                  <TableCell data-label="Zone">
                     <strong>{z.name}</strong>
                     <small>{z.notes}</small>
                   </TableCell>
-                  <TableCell>{money(z.fee)}</TableCell>
-                  <TableCell>{money(z.minimum)}</TableCell>
-                  <TableCell>
+                  <TableCell data-label="Fee">{money(z.fee)}</TableCell>
+                  <TableCell data-label="Minimum order">
+                    {money(z.minimum)}
+                  </TableCell>
+                  <TableCell data-label="Free delivery">
                     {z.freeAbove === null ? 'Not set' : money(z.freeAbove)}
                   </TableCell>
-                  <TableCell>
+                  <TableCell data-label="Availability">
                     <StatusBadge value={z.active ? 'active' : 'suspended'} />
                   </TableCell>
-                  <TableCell>
+                  <TableCell data-label="Actions">
                     <button className="text-link" onClick={() => setEdit(z)}>
                       Edit
                     </button>
@@ -241,11 +243,11 @@ export function Team() {
           <TableBody>
             {r.data?.map((u) => (
               <TableRow key={u.id}>
-                <TableCell>
+                <TableCell data-label="Employee">
                   <strong>{u.name}</strong>
                   <small>{u.email}</small>
                 </TableCell>
-                <TableCell>
+                <TableCell data-label="Role">
                   {u.role === 'owner' ? (
                     roleLabels.owner
                   ) : (
@@ -273,10 +275,10 @@ export function Team() {
                     />
                   )}
                 </TableCell>
-                <TableCell>
+                <TableCell data-label="Access">
                   <StatusBadge value={u.active ? 'active' : 'suspended'} />
                 </TableCell>
-                <TableCell>
+                <TableCell data-label="Actions">
                   {u.role !== 'owner' && (
                     <ActionButton
                       className="text-link"

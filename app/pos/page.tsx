@@ -32,6 +32,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarTrigger,
+  useSidebar,
 } from '@/components/ui/sidebar';
 import {
   Table,
@@ -351,24 +352,10 @@ export default function Pos() {
               : 'YOUR BUSINESS'}
           </small>
         </div>
-        <SidebarContent>
-          <div className="sidebar-label">WORKSPACE</div>
-          <SidebarMenu className="app-menu">
-            {nav
-              .filter((n) => !n.permission || perms.includes(n.permission))
-              .map((n) => (
-                <SidebarMenuItem key={n.name}>
-                  <SidebarMenuButton
-                    isActive={view === n.name}
-                    onClick={() => go(n.name)}
-                  >
-                    <n.icon size={18} />
-                    <span>{n.name}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-          </SidebarMenu>
-        </SidebarContent>
+          <SidebarContent>
+            <div className="sidebar-label">WORKSPACE</div>
+            <OwnerNav view={view} perms={perms} go={go} />
+          </SidebarContent>
         <SidebarFooter className="sidebar-foot">
           <a
             className="text-link"
@@ -883,7 +870,7 @@ export default function Pos() {
                   <TableBody>
                     {customers.data?.map((c) => (
                       <TableRow key={c.phone}>
-                        <TableCell>
+                        <TableCell data-label="Customer">
                           <button
                             className="row-link"
                             onClick={() => setSelectedCustomer(c.phone)}
@@ -891,14 +878,18 @@ export default function Pos() {
                             {c.name}
                           </button>
                         </TableCell>
-                        <TableCell>
+                        <TableCell data-label="Contact">
                           {c.phone}
                           <small>{c.email}</small>
                         </TableCell>
-                        <TableCell>{c.orders}</TableCell>
-                        <TableCell>{money(c.revenue)}</TableCell>
-                        <TableCell>{money(c.outstanding)}</TableCell>
-                        <TableCell>
+                        <TableCell data-label="Orders">{c.orders}</TableCell>
+                        <TableCell data-label="Delivered value">
+                          {money(c.revenue)}
+                        </TableCell>
+                        <TableCell data-label="Outstanding">
+                          {money(c.outstanding)}
+                        </TableCell>
+                        <TableCell data-label="Last order">
                           {new Date(c.lastOrder).toLocaleDateString()}
                         </TableCell>
                       </TableRow>
@@ -1090,7 +1081,7 @@ export default function Pos() {
                     <TableBody>
                       {customerProfile.data.orders.map((o) => (
                         <TableRow key={o.id}>
-                          <TableCell>
+                          <TableCell data-label="Order">
                             <button
                               className="row-link"
                               onClick={() => {
@@ -1104,13 +1095,15 @@ export default function Pos() {
                               {new Date(o.createdAt).toLocaleDateString()}
                             </small>
                           </TableCell>
-                          <TableCell>
+                          <TableCell data-label="Status">
                             <StatusBadge value={o.status} />
                           </TableCell>
-                          <TableCell>
+                          <TableCell data-label="Payment">
                             <StatusBadge value={o.payment} />
                           </TableCell>
-                          <TableCell>{money(o.total)}</TableCell>
+                          <TableCell data-label="Total">
+                            {money(o.total)}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -1122,6 +1115,37 @@ export default function Pos() {
         </Modal>
       )}
     </SidebarProvider>
+  );
+}
+function OwnerNav({
+  view,
+  perms,
+  go,
+}: {
+  view: View;
+  perms: Permission[];
+  go: (view: View) => void;
+}) {
+  const { isMobile, setOpenMobile } = useSidebar();
+  return (
+    <SidebarMenu className="app-menu">
+      {nav
+        .filter((n) => !n.permission || perms.includes(n.permission))
+        .map((n) => (
+          <SidebarMenuItem key={n.name}>
+            <SidebarMenuButton
+              isActive={view === n.name}
+              onClick={() => {
+                go(n.name);
+                if (isMobile) setOpenMobile(false);
+              }}
+            >
+              <n.icon size={18} />
+              <span>{n.name}</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        ))}
+    </SidebarMenu>
   );
 }
 function OrderTable({
@@ -1311,20 +1335,20 @@ function OrderTable({
             );
             return (
               <TableRow key={o.id}>
-                <TableCell>
+                <TableCell data-label="Order">
                   <button className="row-link" onClick={() => select(o.id)}>
                     {o.reference}
                   </button>
                   <small>{o.customer}</small>
                 </TableCell>
-                <TableCell>
+                <TableCell data-label="Status">
                   <StatusBadge value={o.status} />
                 </TableCell>
-                <TableCell>{money(o.total)}</TableCell>
-                <TableCell>
+                <TableCell data-label="Total">{money(o.total)}</TableCell>
+                <TableCell data-label="Payment">
                   <StatusBadge value={o.payment} />
                 </TableCell>
-                <TableCell>
+                <TableCell data-label="Next step">
                   {canUsePrimary(o) && normal ? (
                     <button
                       className="button small quick-action"
@@ -1340,7 +1364,7 @@ function OrderTable({
                     <small>No next step</small>
                   )}
                 </TableCell>
-                <TableCell>
+                <TableCell data-label="More">
                   <div className="row-action-group">
                     {(statusExceptions.length > 0 ||
                       deliveryExceptions.length > 0) && (
