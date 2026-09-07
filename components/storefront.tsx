@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Search,
   ShoppingBag,
@@ -54,6 +54,7 @@ export default function Storefront({ slug }: { slug: string }) {
       reference: string;
       total: number;
     } | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const ctx = (
@@ -169,6 +170,13 @@ export default function Storefront({ slug }: { slug: string }) {
     ...new Set([...s.categories, ...products.map((p) => p.category)]),
   ];
 
+  const focusCollectionSearch = () => {
+    document
+      .getElementById('products')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.setTimeout(() => searchInputRef.current?.focus(), 250);
+  };
+
   return (
     <div className="store-page">
       {slug === 'internal-demo' && (
@@ -230,7 +238,11 @@ export default function Storefront({ slug }: { slug: string }) {
 
           {/* Mobile actions */}
           <div className="store-nav-mobile-actions">
-            <button className="nav-icon-btn" aria-label="Search">
+            <button
+              className="nav-icon-btn"
+              onClick={focusCollectionSearch}
+              aria-label="Search products"
+            >
               <Search size={19} />
             </button>
             <button
@@ -322,7 +334,7 @@ export default function Storefront({ slug }: { slug: string }) {
         </section>
 
         {/* ===== PRODUCTS ===== */}
-        <section className="sf-products">
+        <section className="sf-products" id="products">
           <div className="sf-products-header">
             <div>
               <p className="sf-eyebrow">FEATURED PRODUCTS</p>
@@ -332,6 +344,7 @@ export default function Storefront({ slug }: { slug: string }) {
               <div className="sf-search-wrap">
                 <Search size={14} />
                 <input
+                  ref={searchInputRef}
                   className="sf-search-input"
                   aria-label="Search collection"
                   placeholder="Search the collection..."
@@ -494,7 +507,13 @@ export default function Storefront({ slug }: { slug: string }) {
       )}
 
       {/* ===== CART SHEET ===== */}
-      <Sheet open={cartOpen} onOpenChange={setCartOpen}>
+      <Sheet
+        open={cartOpen}
+        onOpenChange={(open) => {
+          setCartOpen(open);
+          if (!open && !done) setCheckout(false);
+        }}
+      >
         <SheetContent className="details-sheet">
           <div className="sheet-inner">
             <SheetHeader>
