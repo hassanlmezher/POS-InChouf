@@ -119,7 +119,7 @@ export default function Home() {
                 </div>
                 {[
                   ['#DEMO-104', 'Studio headphones', 'Picking', 'violet'],
-                  ['#DEMO-103', 'Everyday tote', 'Packed', 'blue'],
+                  ['#DEMO-103', 'Everyday tote', 'Packed', 'violet'],
                   [
                     '#DEMO-102',
                     'Desk essentials',

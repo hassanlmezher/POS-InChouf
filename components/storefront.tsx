@@ -27,7 +27,7 @@ import {
   Choice,
   ProductImage,
 } from './shared';
-import Checkout, { type CartLine } from './checkout';
+import Checkout, { isValidQuantity, type CartLine } from './checkout';
 import { useResource } from '@/lib/client';
 import {
   type Tenant,
@@ -53,8 +53,37 @@ export default function Storefront({ slug }: { slug: string }) {
       trackingUrl: string;
       reference: string;
       total: number;
-    } | null>(null);
+    } | null>(null),
+    [copyFeedback, setCopyFeedback] = useState<'success' | 'error' | null>(
+      null,
+    );
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const copyFeedbackTimerRef = useRef<number | null>(null);
+
+  const copyTrackingLink = async () => {
+    if (!done) return;
+    try {
+      if (!navigator.clipboard) throw new Error('Clipboard unavailable');
+      await navigator.clipboard.writeText(window.location.origin + done.trackingUrl);
+      setCopyFeedback('success');
+    } catch {
+      setCopyFeedback('error');
+    }
+    if (copyFeedbackTimerRef.current !== null)
+      window.clearTimeout(copyFeedbackTimerRef.current);
+    copyFeedbackTimerRef.current = window.setTimeout(
+      () => setCopyFeedback(null),
+      3200,
+    );
+  };
+
+  useEffect(
+    () => () => {
+      if (copyFeedbackTimerRef.current !== null)
+        window.clearTimeout(copyFeedbackTimerRef.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     const ctx = (
@@ -122,7 +151,10 @@ export default function Storefront({ slug }: { slug: string }) {
           .includes(search.toLowerCase()),
     );
 
-  const count = cart.reduce((s, l) => s + l.quantity, 0);
+  const count = cart.reduce(
+    (s, l) => s + (isValidQuantity(l.quantity) ? l.quantity : 0),
+    0,
+  );
   const priceOf = (l: CartLine) => {
     const p = products.find((p) => p.id === l.productId)!;
     return (
@@ -130,15 +162,24 @@ export default function Storefront({ slug }: { slug: string }) {
         ?.price ?? p.price
     );
   };
-  const total = cart.reduce((s, l) => s + priceOf(l) * l.quantity, 0);
+  const total = cart.reduce(
+    (s, l) => s + priceOf(l) * (isValidQuantity(l.quantity) ? l.quantity : 0),
+    0,
+  );
   const cartStockIssue = cart.some((line) => {
     const p = products.find((product) => product.id === line.productId);
-    return !p || p.stock <= 0 || line.quantity > Math.min(p.stock, 100);
+    return (
+      !p ||
+      !isValidQuantity(line.quantity) ||
+      p.stock <= 0 ||
+      line.quantity > Math.min(p.stock, 100)
+    );
   });
   const add = (line: CartLine) => {
     const product = products.find((p) => p.id === line.productId);
     if (!product || product.stock <= 0) return;
     const max = Math.min(product.stock, 100);
+    if (!isValidQuantity(line.quantity)) return;
     const quantity = Math.min(max, line.quantity);
     setCart((existing) => {
       const index = existing.findIndex(
@@ -150,7 +191,13 @@ export default function Storefront({ slug }: { slug: string }) {
       if (index === -1) return [...existing, { ...line, quantity }];
       return existing.map((item, itemIndex) =>
         itemIndex === index
-          ? { ...item, quantity: Math.min(max, item.quantity + quantity) }
+          ? {
+              ...item,
+              quantity: Math.min(
+                max,
+                (isValidQuantity(item.quantity) ? item.quantity : 0) + quantity,
+              ),
+            }
           : item,
       );
     });
@@ -320,16 +367,25 @@ export default function Storefront({ slug }: { slug: string }) {
               <h2 className="sf-section-title">The collection.</h2>
             </div>
           </div>
-          <div className="filter-pills">
-            {categories.map((c) => (
-              <button
-                key={c}
-                className={category === c ? 'active' : ''}
-                onClick={() => setCategory(c)}
+          <div className="category-filter">
+            <label className="category-filter-label" htmlFor="category-filter">
+              Category
+            </label>
+            <div className="category-select-wrap">
+              <select
+                id="category-filter"
+                aria-label="Filter products by category"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
               >
-                {c}
-              </button>
-            ))}
+                {categories.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={16} aria-hidden="true" />
+            </div>
           </div>
         </section>
 
@@ -537,22 +593,28 @@ export default function Storefront({ slug }: { slug: string }) {
                     {done.reference} · {money(done.total)}
                   </div>
                   <p>
-                    Your order is in the shop&apos;s queue. Use this private
-                    link to follow its progress.
+                    Your order is in the shop&apos;s queue. Copy this private link
+                    and save it somewhere safe before tracking your order. You
+                    will need it to check the order status later.
                   </p>
+                  <div className="tracking-save-note">
+                    <strong>Save your link before you continue.</strong>
+                    <span>
+                      The link is private and is the only way to access your
+                      order status later.
+                    </span>
+                  </div>
+                  <button
+                    className="button secondary"
+                    onClick={copyTrackingLink}
+                  >
+                    {copyFeedback === 'success'
+                      ? 'Tracking link copied'
+                      : 'Copy tracking link'}
+                  </button>
                   <a className="button" href={done.trackingUrl}>
                     Track your order <ArrowRight size={16} />
                   </a>
-                  <button
-                    className="button secondary"
-                    onClick={() => {
-                      navigator.clipboard
-                        .writeText(location.origin + done.trackingUrl)
-                        .catch(() => {});
-                    }}
-                  >
-                    Copy tracking link
-                  </button>
                   <small style={{ overflowWrap: 'anywhere' }}>
                     {location.origin + done.trackingUrl}
                   </small>
@@ -584,7 +646,13 @@ export default function Storefront({ slug }: { slug: string }) {
                   {cart.map((l, i) => {
                     const p = products.find((p) => p.id === l.productId)!;
                     const max = Math.min(p.stock, 100);
-                    const overStock = l.quantity > max || p.stock === 0;
+                    const quantity = isValidQuantity(l.quantity)
+                      ? l.quantity
+                      : 0;
+                    const overStock =
+                      !isValidQuantity(l.quantity) ||
+                      quantity > max ||
+                      p.stock === 0;
                     return (
                       <div className="cart-line" key={i}>
                         <div className="cart-photo">
@@ -604,11 +672,11 @@ export default function Storefront({ slug }: { slug: string }) {
                               aria-label={`Decrease ${p.name}`}
                               onClick={() =>
                                 setCart(
-                                  l.quantity === 1
+                                  quantity <= 1
                                     ? cart.filter((_, n) => n !== i)
                                     : cart.map((x, n) =>
                                         n === i
-                                          ? { ...x, quantity: x.quantity - 1 }
+                                          ? { ...x, quantity: quantity - 1 }
                                           : x,
                                       ),
                                 )
@@ -619,12 +687,12 @@ export default function Storefront({ slug }: { slug: string }) {
                             <span>{l.quantity}</span>
                             <button
                               aria-label={`Increase ${p.name}`}
-                              disabled={l.quantity >= max}
+                              disabled={quantity >= max}
                               onClick={() =>
                                 setCart(
                                   cart.map((x, n) =>
                                     n === i
-                                      ? { ...x, quantity: x.quantity + 1 }
+                                      ? { ...x, quantity: quantity + 1 }
                                       : x,
                                   ),
                                 )
@@ -676,6 +744,18 @@ export default function Storefront({ slug }: { slug: string }) {
           </div>
         </SheetContent>
       </Sheet>
+
+      {copyFeedback && (
+        <div
+          className={`toast-message ${copyFeedback}`}
+          role={copyFeedback === 'error' ? 'alert' : 'status'}
+          aria-live="polite"
+        >
+          {copyFeedback === 'success'
+            ? 'Tracking link copied. Save it somewhere safe.'
+            : 'Could not copy the link automatically. Select the link below to copy it.'}
+        </div>
+      )}
     </div>
   );
 }
@@ -692,11 +772,11 @@ function ProductDialog({
   const variants = JSON.parse(p.variants) as Variant[],
     fields = JSON.parse(p.customFields) as CustomField[];
   const [variant, setVariant] = useState(variants[0]?.name || ''),
-    [quantity, setQuantity] = useState(1),
+    [quantity, setQuantity] = useState<number | ''>(1),
     [custom, setCustom] = useState<Record<string, string>>({});
   const price = variants.find((v) => v.name === variant)?.price ?? p.price;
   const max = Math.min(p.stock, 100);
-  const validQuantity = p.stock > 0 && quantity >= 1 && quantity <= max;
+  const validQuantity = p.stock > 0 && isValidQuantity(quantity) && quantity <= max;
   return (
     <Modal open title={p.name} description={p.description} onClose={onClose}>
       <div className="product-detail-photo">
@@ -731,17 +811,16 @@ function ProductDialog({
             max={max}
             value={quantity}
             onChange={(e) => {
-              const next = Number(e.target.value);
-              setQuantity(
-                Number.isFinite(next)
-                  ? Math.min(Math.max(1, next), max || 1)
-                  : 1,
-              );
+              const value = e.target.value;
+              setQuantity(value === '' ? '' : Number(value));
             }}
             required
           />
         </Field>
-        {quantity > max && (
+        {!validQuantity && quantity === '' && (
+          <small className="danger-text">Enter a quantity before continuing.</small>
+        )}
+        {isValidQuantity(quantity) && quantity > max && (
           <small className="danger-text">Only {max} units available.</small>
         )}
         {fields
@@ -764,7 +843,9 @@ function ProductDialog({
         <button className="button" disabled={!validQuantity} type="submit">
           {p.stock === 0
             ? 'Out of stock'
-            : `Add to bag · ${money(price * quantity)}`}
+            : validQuantity
+              ? `Add to bag · ${money(price * quantity)}`
+              : 'Enter a valid quantity'}
           <Plus size={16} />
         </button>
       </form>

@@ -252,11 +252,9 @@ export function StatusBadge({ value }: { value: string }) {
                 'Changes requested',
               ].includes(value)
             ? 'red'
-            : ['Picking', 'Confirmed', 'trial'].includes(value)
+            : ['Picking', 'Confirmed', 'Packed', 'trial'].includes(value)
               ? 'violet'
-              : value === 'Packed'
-                ? 'blue'
-                : 'orange')
+              : 'orange')
       }
     >
       {value}

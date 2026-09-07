@@ -11,9 +11,19 @@ import {
 } from '@/lib/types';
 export interface CartLine {
   productId: string;
-  quantity: number;
+  quantity: number | '';
   variant: string;
   custom: Record<string, string>;
+}
+
+export function isValidQuantity(quantity: CartLine['quantity']): quantity is number {
+  return (
+    typeof quantity === 'number' &&
+    Number.isFinite(quantity) &&
+    Number.isInteger(quantity) &&
+    quantity >= 1 &&
+    quantity <= 100
+  );
 }
 export default function Checkout({
   products,
@@ -48,17 +58,20 @@ export default function Checkout({
     [idempotency] = useState(() => crypto.randomUUID());
   const zone = zones.find((z) => z.id === zoneId);
   const unavailable = !zones.length;
+  const quantityIssue = lines.some((line) => !isValidQuantity(line.quantity));
   const stockIssue = lines.find((line) => {
+    if (!isValidQuantity(line.quantity)) return false;
     const p = products.find((p) => p.id === line.productId);
     return !p || p.stock < line.quantity || p.stock <= 0;
   });
   const subtotal = lines.reduce((sum, line) => {
     const p = products.find((p) => p.id === line.productId);
     if (!p) return sum;
+    const quantity = isValidQuantity(line.quantity) ? line.quantity : 0;
     const v = (JSON.parse(p.variants) as Variant[]).find(
       (v) => v.name === line.variant,
     );
-    return sum + (v?.price ?? p.price) * line.quantity;
+    return sum + (v?.price ?? p.price) * quantity;
   }, 0);
   const fee = zone
     ? zone.freeAbove !== null && subtotal >= zone.freeAbove
@@ -76,7 +89,15 @@ export default function Checkout({
           );
           return;
         }
-        if (!lines.length || stockIssue) {
+        if (!lines.length) {
+          setError('Add at least one item before checkout.');
+          return;
+        }
+        if (quantityIssue) {
+          setError('Enter a whole-number quantity of at least 1 for every item.');
+          return;
+        }
+        if (stockIssue) {
           setError('Stock changed. Please review your bag before checkout.');
           return;
         }

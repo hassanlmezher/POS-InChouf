@@ -1873,21 +1873,16 @@ function ManualOrder({
                     min={1}
                     max={max}
                     value={l.quantity}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const value = e.target.value;
                       setLines(
                         lines.map((x, n) =>
                           n === i
-                            ? {
-                                ...x,
-                                quantity: Math.min(
-                                  Math.max(1, Number(e.target.value)),
-                                  max || 1,
-                                ),
-                              }
+                            ? { ...x, quantity: value === '' ? '' : Number(value) }
                             : x,
                         ),
-                      )
-                    }
+                      );
+                    }}
                   />
                 </Field>
                 <small>Only {max} units available.</small>
