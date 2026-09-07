@@ -1332,7 +1332,7 @@ input.search-input {
   height: 43px;
   width: 43px;
   border-radius: 6px;
-  object-fit: cover;
+  object-fit: contain;
   background: #f5f3f8;
 }
 .mini-product .no-image span {
@@ -1356,7 +1356,7 @@ input.search-input {
 .product-photo img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
 }
 .product-admin-card .panel-body {
   padding: 20px;
@@ -1692,7 +1692,7 @@ input.search-input {
 .scene-product img {
   height: 220px;
   width: 100%;
-  object-fit: cover;
+  object-fit: contain;
 }
 .scene-product > span {
   display: flex;
@@ -1785,11 +1785,11 @@ input.search-input {
 .store-product-photo img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   transition: transform 0.3s;
 }
 .store-product-photo:hover img {
-  transform: scale(1.035);
+  transform: none;
 }
 .custom-badge {
   position: absolute;
@@ -1882,7 +1882,7 @@ input.search-input {
 .cart-photo img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
 }
 .cart-line h3 {
   font-size: 16px;
@@ -1939,7 +1939,7 @@ input.search-input {
   width: 52px;
   height: 52px;
   border-radius: 6px;
-  object-fit: cover;
+  object-fit: contain;
 }
 .manual-product .no-image span {
   display: none;
