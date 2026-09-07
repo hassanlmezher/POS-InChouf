@@ -83,7 +83,13 @@ export default function Tracking({
       </section>
       <div className="tracking-steps">
         {flow.map((s, i) => (
-          <div className={i <= index ? 'complete' : ''} key={s}>
+          <div
+            className={
+              i < index ? 'complete' : i === index ? 'current' : ''
+            }
+            aria-current={i === index ? 'step' : undefined}
+            key={s}
+          >
             <span>{i < index ? <CheckCircle2 size={18} /> : i + 1}</span>
             <p>{s}</p>
           </div>

@@ -2487,6 +2487,11 @@ input.search-input {
    TRACKING PAGE
    ============================================================ */
 .tracking-page {
+  --sf-accent: #7c3aed;
+  --sf-text: #111827;
+  --sf-text-muted: #6b7280;
+  --sf-text-dim: #9ca3af;
+  --sf-border: #e5e7eb;
   max-width: 780px;
   padding: 30px 25px;
   margin: auto;
@@ -2544,6 +2549,12 @@ input.search-input {
   color: white;
   border-color: transparent;
 }
+.tracking-steps .current span {
+  background: #2563eb;
+  color: white;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 6px rgba(37, 99, 235, 0.12);
+}
 .tracking-steps p {
   font-size: 11px;
   margin-top: 11px;
@@ -2551,6 +2562,10 @@ input.search-input {
 }
 .tracking-steps .complete p {
   color: var(--sf-accent);
+}
+.tracking-steps .current p {
+  color: #1d4ed8;
+  font-weight: 700;
 }
 .private-note {
   font-size: 12px;
