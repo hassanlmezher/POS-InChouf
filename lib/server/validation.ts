@@ -174,6 +174,7 @@ export const settingsInput = z
     address: text,
     paymentOptions: z.array(z.string().min(1).max(80)).min(1).max(5),
     categories: z.array(z.string().min(1).max(80)).max(40),
+    deliveryProviders: z.array(z.string().min(1).max(120)).max(40),
     currency: z.literal('USD'),
     branding: z
       .object({ logoId: z.union([id, z.null()]) })

@@ -399,6 +399,7 @@ void test('tenant isolation covers catalog, orders, storefronts and settings', a
       address: 'Updated address',
       paymentOptions: ['Cash on delivery'],
       categories: ['General'],
+      deliveryProviders: ['Fleet Co'],
       currency: 'USD',
     },
     h.cookie,
@@ -408,6 +409,7 @@ void test('tenant isolation covers catalog, orders, storefronts and settings', a
     (await h.get<{ settings: string }>('SELECT settings FROM tenants WHERE id=?', h.tenant))!
       .settings,
   );
+  assert.deepEqual(savedSettings.deliveryProviders, ['Fleet Co']);
   assert.deepEqual(savedSettings.branding, { logoId: 'existing-logo' });
   assert.equal(savedSettings.tagline, 'Updated storefront');
   const publicStore = await h.request('store/internal-demo');
@@ -584,6 +586,7 @@ void test('business owners can change only their own storefront logo', async () 
       address: '',
       paymentOptions: ['Cash on delivery'],
       categories: ['General'],
+      deliveryProviders: ['Fleet Co'],
       currency: 'USD',
       branding: { logoId },
     },
@@ -624,6 +627,7 @@ void test('business owners can change only their own storefront logo', async () 
       address: '',
       paymentOptions: ['Cash on delivery'],
       categories: ['General'],
+      deliveryProviders: ['Fleet Co'],
       currency: 'USD',
       branding: { logoId: 'other-logo' },
     },
@@ -931,6 +935,10 @@ void test('cash settlements calculate variance, update balanced COD orders and p
   const h = await setup();
   await createDeliveredExternalOrder(h, 'Fleet Co');
   await createDeliveredExternalOrder(h, 'Fleet Co');
+  const options = (await (
+    await h.request('settlements', 'GET', undefined, h.cookie)
+  ).json()) as { providerOptions: string[] };
+  assert.deepEqual(options.providerOptions, ['Fleet Co']);
   const expected = Number(
     (await h.get<{ total: number }>(
       "SELECT SUM(total) total FROM orders WHERE tenantId=? AND deliveryProvider='Fleet Co'",

@@ -109,6 +109,12 @@ type SettlementOrder = {
   status: string;
   payment: string;
 };
+
+type SettlementData = {
+  settlements: Settlement[];
+  orders: SettlementOrder[];
+  providerOptions: string[];
+};
 type View =
   | 'Overview'
   | 'Orders'
@@ -214,12 +220,12 @@ export default function Pos() {
       : null,
     { intervalMs: 30000 },
   );
-  const settlements = useResource<{
-    settlements: Settlement[];
-    orders: SettlementOrder[];
-  }>(view === 'Delivery' && user?.role === 'owner' ? 'settlements' : null, {
-    intervalMs: 30000,
-  });
+  const settlements = useResource<SettlementData>(
+    view === 'Delivery' && user?.role === 'owner' ? 'settlements' : null,
+    {
+      intervalMs: 30000,
+    },
+  );
   const csvRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const timer = window.setTimeout(
@@ -296,6 +302,7 @@ export default function Pos() {
   const tenantLogo = settingsOf(tenant).branding?.logoId
     ? `/api/store/${tenant.slug}/logo`
     : '';
+  const tenantSettings = settingsOf(tenant);
   const metrics = [
     [
       'New orders',
@@ -469,6 +476,7 @@ export default function Pos() {
                     select={setSelected}
                     user={user}
                     team={team.data || []}
+                    deliveryProviders={tenantSettings.deliveryProviders}
                     onSaved={refresh}
                     notify={setToast}
                   />
@@ -600,6 +608,7 @@ export default function Pos() {
                   select={setSelected}
                   user={user}
                   team={team.data || []}
+                  deliveryProviders={tenantSettings.deliveryProviders}
                   onSaved={refresh}
                   notify={setToast}
                 />
@@ -607,6 +616,7 @@ export default function Pos() {
               {view === 'Delivery' && user.role === 'owner' && (
                 <SettlementPanel
                   data={settlements.data}
+                  deliveryProviders={tenantSettings.deliveryProviders}
                   error={settlements.error}
                   refresh={async () => {
                     await settlements.refresh();
@@ -1002,6 +1012,7 @@ export default function Pos() {
       {editing !== undefined && (
         <ProductEditor
           product={editing}
+          categoryOptions={tenantSettings.categories}
           onClose={() => setEditing(undefined)}
           onSaved={() => {
             setEditing(undefined);
@@ -1153,6 +1164,7 @@ function OrderTable({
   select,
   user,
   team,
+  deliveryProviders,
   onSaved,
   notify,
 }: {
@@ -1160,6 +1172,7 @@ function OrderTable({
   select: (id: string) => void;
   user: User;
   team: User[];
+  deliveryProviders: string[];
   onSaved: () => void;
   notify: (toast: { kind: 'success' | 'error'; text: string }) => void;
 }) {
@@ -1178,6 +1191,15 @@ function OrderTable({
     [reason, setReason] = useState('');
   const drivers = team.filter((u) =>
     ['owner', 'delivery_manager'].includes(u.role),
+  );
+  const courierOptions = Array.from(
+    new Set([
+      ...deliveryProviders.map((provider) => provider.trim()).filter(Boolean),
+      ...orders
+        .filter((order) => order.deliveryMethod === 'external_courier')
+        .map((order) => order.deliveryProvider.trim())
+        .filter(Boolean),
+    ]),
   );
   const primary: Record<string, { label: string; status: string }> = {
     New: { label: 'Confirm order', status: 'Confirmed' },
@@ -1217,7 +1239,7 @@ function OrderTable({
     setHandoff(order);
     setHandoffMethod(order.deliveryMethod || 'internal_driver');
     setHandoffDriver(order.driverId || 'none');
-    setHandoffProvider(order.deliveryProvider || '');
+    setHandoffProvider(order.deliveryProvider || courierOptions[0] || '');
   };
   const handoffReady = (order: Order) =>
     order.deliveryMethod === 'external_courier'
@@ -1427,7 +1449,11 @@ function OrderTable({
                 handoffDriver === 'none'
               )
                 return;
-              if (handoffMethod === 'external_courier' && !provider) return;
+              if (
+                handoffMethod === 'external_courier' &&
+                (!provider || !courierOptions.includes(provider))
+              )
+                return;
               void submit(
                 handoff,
                 handoffMethod === 'internal_driver'
@@ -1450,9 +1476,12 @@ function OrderTable({
             <Choice
               label="Delivery method"
               value={handoffMethod}
-              onChange={(v) =>
-                setHandoffMethod(v as 'internal_driver' | 'external_courier')
-              }
+              onChange={(v) => {
+                const next = v as 'internal_driver' | 'external_courier';
+                setHandoffMethod(next);
+                if (next === 'external_courier' && !handoffProvider)
+                  setHandoffProvider(courierOptions[0] || '');
+              }}
               options={[
                 { value: 'internal_driver', label: 'Internal driver' },
                 { value: 'external_courier', label: 'External courier' },
@@ -1469,20 +1498,25 @@ function OrderTable({
                 ]}
               />
             ) : (
-              <Field label="Courier company">
-                <input
-                  value={handoffProvider}
-                  maxLength={120}
-                  onChange={(e) => setHandoffProvider(e.target.value)}
-                  placeholder="Courier or delivery company"
-                />
-              </Field>
+              <Choice
+                label="Courier company"
+                value={handoffProvider}
+                onChange={setHandoffProvider}
+                options={courierOptions}
+              />
             )}
             {handoffMethod === 'internal_driver' && !drivers.length && (
               <small className="danger-text">
                 Add an active delivery manager before using internal delivery.
               </small>
             )}
+            {handoffMethod === 'external_courier' &&
+              !courierOptions.length && (
+                <small className="danger-text">
+                  Add external courier companies in Storefront settings before
+                  using external delivery.
+                </small>
+              )}
             <div className="form-actions">
               <button
                 className="button secondary"
@@ -1500,7 +1534,8 @@ function OrderTable({
                   (handoffMethod === 'internal_driver' &&
                     handoffDriver === 'none') ||
                   (handoffMethod === 'external_courier' &&
-                    !handoffProvider.trim())
+                    (!handoffProvider.trim() ||
+                      !courierOptions.includes(handoffProvider)))
                 }
               >
                 {busyId === handoff.id ? 'Saving...' : 'Hand off'}
@@ -1561,10 +1596,12 @@ function OrderTable({
 
 function SettlementPanel({
   data,
+  deliveryProviders,
   error,
   refresh,
 }: {
-  data: { settlements: Settlement[]; orders: SettlementOrder[] } | null;
+  data: SettlementData | null;
+  deliveryProviders: string[];
   error: string;
   refresh: () => Promise<void>;
 }) {
@@ -1583,6 +1620,17 @@ function SettlementPanel({
   const drivers =
     team.data?.filter((u) => ['owner', 'delivery_manager'].includes(u.role)) ||
     [];
+  const courierOptions = Array.from(
+    new Set([
+      ...deliveryProviders.map((provider) => provider.trim()).filter(Boolean),
+      ...(data?.providerOptions || [])
+        .map((provider) => provider.trim())
+        .filter(Boolean),
+      ...(data?.settlements || [])
+        .map((settlement) => settlement.provider.trim())
+        .filter(Boolean),
+    ]),
+  );
   const toIso = (date: string, end = false) =>
     date
       ? new Date(
@@ -1656,14 +1704,18 @@ function SettlementPanel({
                 ]}
               />
             ) : (
-              <Field label="Courier company">
-                <input
-                  value={provider}
-                  maxLength={120}
-                  onChange={(e) => setProvider(e.target.value)}
-                  required
-                />
-              </Field>
+              <Choice
+                label="Courier company"
+                value={provider}
+                onChange={setProvider}
+                options={courierOptions}
+              />
+            )}
+            {method === 'external_courier' && !courierOptions.length && (
+              <small className="danger-text">
+                Add external courier companies in Storefront settings, or hand
+                off an order to an external courier first.
+              </small>
             )}
             <Field label="Period start">
               <input
@@ -1695,7 +1747,8 @@ function SettlementPanel({
             disabled={
               actual === '' ||
               (method === 'internal_driver' && driverId === 'none') ||
-              (method === 'external_courier' && !provider.trim())
+              (method === 'external_courier' &&
+                (!provider.trim() || !courierOptions.includes(provider)))
             }
           >
             Create settlement

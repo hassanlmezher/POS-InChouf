@@ -1,17 +1,25 @@
 'use client';
 import { useState } from 'react';
-import { Modal, Field, Toggle, ErrorBox, Submit } from './shared';
+import { Modal, Field, Toggle, ErrorBox, Submit, Choice } from './shared';
 import { api, message, uploadFile } from '@/lib/client';
 import type { Product, Variant, CustomField } from '@/lib/types';
 export default function ProductEditor({
   product,
+  categoryOptions,
   onClose,
   onSaved,
 }: {
   product: Product | null;
+  categoryOptions: string[];
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const categories = Array.from(
+    new Set([
+      ...(categoryOptions.length ? categoryOptions : ['General']),
+      ...(product?.category ? [product.category] : []),
+    ]),
+  );
   const [name, setName] = useState(product?.name || ''),
     [description, setDescription] = useState(product?.description || ''),
     [category, setCategory] = useState(product?.category || 'General'),
@@ -74,13 +82,12 @@ export default function ProductEditor({
               required
             />
           </Field>
-          <Field label="Category">
-            <input
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              required
-            />
-          </Field>
+          <Choice
+            label="Category"
+            value={category}
+            onChange={setCategory}
+            options={categories}
+          />
           <Field label="Price ($)">
             <input
               type="number"

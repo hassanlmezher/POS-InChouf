@@ -31,6 +31,13 @@ import {
   money,
   settingsOf,
 } from '@/lib/types';
+
+const lines = (value: string) =>
+  value
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+
 export function Zones() {
   const r = useResource<Zone[]>('zones');
   const [edit, setEdit] = useState<Zone | null | undefined>(undefined);
@@ -414,6 +421,7 @@ export function StoreSettings({
     address: s.address,
     paymentOptions: s.paymentOptions,
     categories: s.categories,
+    deliveryProviders: s.deliveryProviders,
     currency: s.currency,
     branding: s.branding,
   };
@@ -489,7 +497,7 @@ export function StoreSettings({
             <textarea
               value={s.categories.join('\n')}
               onChange={(e) =>
-                setS({ ...s, categories: e.target.value.split('\n') })
+                setS({ ...s, categories: lines(e.target.value) })
               }
             />
           </Field>
@@ -497,7 +505,15 @@ export function StoreSettings({
             <textarea
               value={s.paymentOptions.join('\n')}
               onChange={(e) =>
-                setS({ ...s, paymentOptions: e.target.value.split('\n') })
+                setS({ ...s, paymentOptions: lines(e.target.value) })
+              }
+            />
+          </Field>
+          <Field label="External courier companies (one per line)">
+            <textarea
+              value={s.deliveryProviders.join('\n')}
+              onChange={(e) =>
+                setS({ ...s, deliveryProviders: lines(e.target.value) })
               }
             />
           </Field>

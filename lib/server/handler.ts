@@ -1161,6 +1161,13 @@ async function route(req: Request, env: Runtime): Promise<Response> {
           'SELECT so.settlementId,so.amount,o.reference,o.customer,o.status,o.payment FROM settlementorders so JOIN orders o ON o.tenantId=so.tenantId AND o.id=so.orderId WHERE so.tenantId=? ORDER BY o.createdAt DESC LIMIT 500',
           t,
         ),
+        providerOptions: (
+          await rows<{ provider: string }>(
+            db,
+            "SELECT DISTINCT o.deliveryProvider AS provider FROM orders o LEFT JOIN settlementorders so ON so.tenantId=o.tenantId AND so.orderId=o.id WHERE o.tenantId=? AND o.deliveryMethod='external_courier' AND o.deliveryProvider!='' AND o.status='Delivered' AND o.paymentMethod='Cash on delivery' AND o.payment!='Refunded' AND so.id IS NULL ORDER BY o.deliveryProvider LIMIT 100",
+            t,
+          )
+        ).map((row) => row.provider),
       });
     }
     if (method === 'POST') {

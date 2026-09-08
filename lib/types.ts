@@ -93,6 +93,7 @@ export interface Settings {
   address: string;
   paymentOptions: string[];
   categories: string[];
+  deliveryProviders: string[];
   currency: string;
   branding?: {
     logoId: string | null;
@@ -106,6 +107,7 @@ export const defaultSettings: Settings = {
   address: '',
   paymentOptions: ['Cash on delivery'],
   categories: ['General'],
+  deliveryProviders: [],
   currency: 'USD',
 };
 export interface Variant {
@@ -222,6 +224,8 @@ export const settingsOf = (t: Tenant): Settings => {
     address: stored.address ?? defaultSettings.address,
     paymentOptions: stored.paymentOptions ?? defaultSettings.paymentOptions,
     categories: stored.categories ?? defaultSettings.categories,
+    deliveryProviders:
+      stored.deliveryProviders ?? defaultSettings.deliveryProviders,
     currency: stored.currency ?? defaultSettings.currency,
     branding: stored.branding,
   };
