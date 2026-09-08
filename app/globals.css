@@ -23,7 +23,7 @@
   --foreground: #23222c;
   --primary: #7045d5;
   --border: #e9e8ee;
-  --sidebar: #fafafd;
+  --sidebar: #fff;
   --sidebar-foreground: #62616f;
   --sidebar-primary: #7045d5;
   --sidebar-primary-foreground: white;
@@ -956,10 +956,14 @@ input.search-input {
   min-height: 100vh;
   background: #fafafd;
 }
+.app-sidebar [data-slot='sidebar-container'] {
+  background: #fff;
+}
 .app-sidebar [data-slot='sidebar-inner'] {
-  background: #faf9fc;
+  background: #fff;
 }
 .app-sidebar {
+  background: #fff;
   border-right: 1px solid var(--border);
 }
 .sidebar-brand {
