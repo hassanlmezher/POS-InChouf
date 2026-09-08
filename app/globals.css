@@ -2211,25 +2211,6 @@ input.search-input {
 .sf-search-input::placeholder {
   color: var(--sf-text-dim);
 }
-.sf-sort-wrap {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 13px;
-  color: var(--sf-text-muted);
-  border: 1px solid var(--sf-border);
-  border-radius: 8px;
-  padding: 8px 12px;
-  background: white;
-  cursor: pointer;
-  white-space: nowrap;
-  user-select: none;
-}
-.sf-sort-wrap strong {
-  color: var(--sf-text);
-  font-weight: 600;
-}
-
 /* Product grid */
 .store-product-grid {
   display: grid;
@@ -2804,9 +2785,6 @@ input.search-input {
   }
   .store-info {
     padding: 36px 20px;
-  }
-  .sf-sort-wrap {
-    display: none;
   }
 }
 @media (max-width: 460px) {

@@ -408,11 +408,6 @@ export default function Storefront({ slug }: { slug: string }) {
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
-              <div className="sf-sort-wrap">
-                <span>Sort by</span>
-                <strong>Featured</strong>
-                <ChevronDown size={13} />
-              </div>
             </div>
           </div>
 
