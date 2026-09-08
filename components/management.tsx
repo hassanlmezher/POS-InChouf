@@ -419,9 +419,9 @@ export function StoreSettings({
     contactEmail: s.contactEmail,
     contactPhone: s.contactPhone,
     address: s.address,
-    paymentOptions: s.paymentOptions,
-    categories: s.categories,
-    deliveryProviders: s.deliveryProviders,
+    paymentOptions: lines(s.paymentOptions.join('\n')),
+    categories: lines(s.categories.join('\n')),
+    deliveryProviders: lines(s.deliveryProviders.join('\n')),
     currency: s.currency,
     branding: s.branding,
   };
@@ -497,7 +497,7 @@ export function StoreSettings({
             <textarea
               value={s.categories.join('\n')}
               onChange={(e) =>
-                setS({ ...s, categories: lines(e.target.value) })
+                setS({ ...s, categories: e.target.value.split('\n') })
               }
             />
           </Field>
@@ -505,7 +505,7 @@ export function StoreSettings({
             <textarea
               value={s.paymentOptions.join('\n')}
               onChange={(e) =>
-                setS({ ...s, paymentOptions: lines(e.target.value) })
+                setS({ ...s, paymentOptions: e.target.value.split('\n') })
               }
             />
           </Field>
@@ -513,7 +513,7 @@ export function StoreSettings({
             <textarea
               value={s.deliveryProviders.join('\n')}
               onChange={(e) =>
-                setS({ ...s, deliveryProviders: lines(e.target.value) })
+                setS({ ...s, deliveryProviders: e.target.value.split('\n') })
               }
             />
           </Field>
