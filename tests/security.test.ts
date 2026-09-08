@@ -1018,6 +1018,13 @@ void test('cash settlements calculate variance, update balanced COD orders and p
 
 void test('Supabase Auth-backed login creates app sessions and enforces expiry and suspension', async () => {
   const h = await setup();
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const failed = await h.request('login', 'POST', {
+      email: 'owner@demo.inchouf.test',
+      password: 'not-the-password',
+    });
+    assert.equal(failed.status, 401);
+  }
   const login = await h.request('login', 'POST', {
     email: 'owner@demo.inchouf.test',
     password: passwords.owner,

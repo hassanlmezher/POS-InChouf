@@ -297,7 +297,6 @@ async function route(req: Request, env: Runtime): Promise<Response> {
     );
   }
   if (p[0] === 'login' && method === 'POST') {
-    await stage('login.rate_limit', rateLimit(req, db, 'login', 10));
     const input = await body(req, loginInput);
     const signedIn = await stage(
       'login.supabase_auth',
