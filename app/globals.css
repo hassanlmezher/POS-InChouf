@@ -966,6 +966,15 @@ input.search-input {
   background: #fff;
   border-right: 1px solid var(--border);
 }
+.mobile-sidebar-sheet {
+  background: #fff !important;
+  opacity: 1;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.mobile-sidebar-body {
+  background: #fff;
+}
 .sidebar-brand {
   padding: 30px 22px 15px;
 }
