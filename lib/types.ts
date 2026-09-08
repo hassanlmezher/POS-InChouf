@@ -204,6 +204,14 @@ export interface Settlement {
   createdBy: string;
   createdAt: string;
 }
+export interface SettlementTarget {
+  method: 'internal_driver' | 'external_courier';
+  driverId: string | null;
+  provider: string;
+  label: string;
+  expected: number;
+  count: number;
+}
 export interface Detail {
   order: Order;
   items: Item[];

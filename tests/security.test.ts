@@ -125,6 +125,33 @@ async function createDeliveredExternalOrder(
   return id;
 }
 
+async function createDeliveredInternalOrder(
+  h: Awaited<ReturnType<typeof setup>>,
+  driverId: string,
+) {
+  const id = await createPackedOrder(h);
+  let response = await h.request(
+    `orders/${id}`,
+    'PATCH',
+    {
+      version: 3,
+      status: 'Out for Delivery',
+      deliveryMethod: 'internal_driver',
+      driverId,
+    },
+    h.cookie,
+  );
+  assert.equal(response.status, 200, await response.text());
+  response = await h.request(
+    `orders/${id}`,
+    'PATCH',
+    { version: 4, status: 'Delivered' },
+    h.cookie,
+  );
+  assert.equal(response.status, 200, await response.text());
+  return id;
+}
+
 void test('production bootstrap creates only the first platform admin', async () => {
   const h = await harness();
   const adminHost = 'https://admin.inchouf.com';
@@ -937,13 +964,42 @@ void test('cash settlements calculate variance, update balanced COD orders and p
   await createDeliveredExternalOrder(h, 'Fleet Co');
   const options = (await (
     await h.request('settlements', 'GET', undefined, h.cookie)
-  ).json()) as { providerOptions: string[] };
+  ).json()) as {
+    providerOptions: string[];
+    targets: {
+      method: string;
+      provider: string;
+      expected: number;
+      count: number;
+    }[];
+  };
   assert.deepEqual(options.providerOptions, ['Fleet Co']);
+  assert.deepEqual(
+    options.targets.map((target) => ({
+      method: target.method,
+      provider: target.provider,
+      expected: Number(target.expected),
+      count: Number(target.count),
+    })),
+    [
+      {
+        method: 'external_courier',
+        provider: 'Fleet Co',
+        expected: Number(
+          (await h.get<{ subtotal: number }>(
+            "SELECT SUM(subtotal) subtotal FROM orders WHERE tenantId=? AND deliveryProvider='Fleet Co'",
+            h.tenant,
+          ))!.subtotal,
+        ),
+        count: 2,
+      },
+    ],
+  );
   const expected = Number(
-    (await h.get<{ total: number }>(
-      "SELECT SUM(total) total FROM orders WHERE tenantId=? AND deliveryProvider='Fleet Co'",
+    (await h.get<{ subtotal: number }>(
+      "SELECT SUM(subtotal) subtotal FROM orders WHERE tenantId=? AND deliveryProvider='Fleet Co'",
       h.tenant,
-    ))!.total,
+    ))!.subtotal,
   );
 
   const missing = await h.request(
@@ -983,10 +1039,10 @@ void test('cash settlements calculate variance, update balanced COD orders and p
 
   await createDeliveredExternalOrder(h, 'Balanced Co');
   const balancedExpected = Number(
-    (await h.get<{ total: number }>(
-      "SELECT SUM(total) total FROM orders WHERE tenantId=? AND deliveryProvider='Balanced Co'",
+    (await h.get<{ subtotal: number }>(
+      "SELECT SUM(subtotal) subtotal FROM orders WHERE tenantId=? AND deliveryProvider='Balanced Co'",
       h.tenant,
-    ))!.total,
+    ))!.subtotal,
   );
   const balanced = await h.request(
     'settlements',
@@ -999,13 +1055,68 @@ void test('cash settlements calculate variance, update balanced COD orders and p
     h.cookie,
   );
   assert.equal(balanced.status, 201, await balanced.text());
-  assert.equal(
-    (await h.get<{ payment: string; cashCollected: number }>(
-      "SELECT payment,cashCollected FROM orders WHERE tenantId=? AND deliveryProvider='Balanced Co'",
-      h.tenant,
-    ))!.payment,
-    'Paid',
+  const balancedOrder = (await h.get<{
+    payment: string;
+    cashCollected: number;
+    subtotal: number;
+    total: number;
+  }>(
+    "SELECT payment,cashCollected,subtotal,total FROM orders WHERE tenantId=? AND deliveryProvider='Balanced Co'",
+    h.tenant,
+  ))!;
+  assert.equal(balancedOrder.payment, 'Paid');
+  assert.equal(balancedOrder.cashCollected, balancedOrder.subtotal);
+  assert.ok(balancedOrder.total > balancedOrder.subtotal);
+
+  const driver = (await h.get<{ id: string }>(
+    "SELECT id FROM users WHERE role='delivery_manager'",
+  ))!;
+  await createDeliveredInternalOrder(h, driver.id);
+  const internalOrder = (await h.get<{ subtotal: number; total: number }>(
+    'SELECT subtotal,total FROM orders WHERE tenantId=? AND driverId=? ORDER BY createdAt DESC LIMIT 1',
+    h.tenant,
+    driver.id,
+  ))!;
+  assert.ok(internalOrder.total > internalOrder.subtotal);
+  const internalTargets = (await (
+    await h.request('settlements', 'GET', undefined, h.cookie)
+  ).json()) as {
+    targets: {
+      method: string;
+      driverId: string | null;
+      expected: number;
+      count: number;
+    }[];
+  };
+  assert.deepEqual(
+    internalTargets.targets
+      .filter((target) => target.method === 'internal_driver')
+      .map((target) => ({
+        driverId: target.driverId,
+        expected: Number(target.expected),
+        count: Number(target.count),
+      })),
+    [{ driverId: driver.id, expected: internalOrder.total, count: 1 }],
   );
+  const internal = await h.request(
+    'settlements',
+    'POST',
+    {
+      method: 'internal_driver',
+      driverId: driver.id,
+      actual: internalOrder.total,
+    },
+    h.cookie,
+  );
+  assert.equal(internal.status, 201, await internal.text());
+  const paidInternal = (await h.get<{ payment: string; cashCollected: number }>(
+    'SELECT payment,cashCollected FROM orders WHERE tenantId=? AND driverId=? ORDER BY createdAt DESC LIMIT 1',
+      h.tenant,
+      driver.id,
+    ))!;
+  assert.equal(paidInternal.payment, 'Paid');
+  assert.equal(paidInternal.cashCollected, internalOrder.total);
+
   const pickerCookie = await cookieForRole(h, 'picker');
   assert.equal(
     (

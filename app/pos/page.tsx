@@ -70,6 +70,7 @@ import {
   type Permission,
   type Event,
   type Settlement,
+  type SettlementTarget,
   rolePermissions,
   roleLabels,
   statuses,
@@ -114,6 +115,7 @@ type SettlementData = {
   settlements: Settlement[];
   orders: SettlementOrder[];
   providerOptions: string[];
+  targets: SettlementTarget[];
 };
 type View =
   | 'Overview'
@@ -178,6 +180,7 @@ export default function Pos() {
   const me = useResource<{ user: User; tenant: Tenant | null }>('me');
   const [view, setView] = useState<View>('Overview'),
     [filter, setFilter] = useState('All orders'),
+    [deliveryFilter, setDeliveryFilter] = useState('all'),
     [search, setSearch] = useState(''),
     [debouncedSearch, setDebouncedSearch] = useState(''),
     [selected, setSelected] = useState<string | null>(null),
@@ -251,17 +254,6 @@ export default function Pos() {
     void products.refresh();
     void team.refresh();
   };
-  const visible = all.filter(
-    (o) =>
-      (view !== 'Delivery' ||
-        ['Packed', 'Out for Delivery', 'Failed Delivery', 'Returned'].includes(
-          o.status,
-        )) &&
-      (filter === 'All orders' || o.status === filter) &&
-      `${o.reference} ${o.customer} ${o.phone}`
-        .toLowerCase()
-        .includes(search.toLowerCase()),
-  );
   if (me.loading) return <Loading />;
   if (me.error || !user || !tenant)
     return (
@@ -303,6 +295,119 @@ export default function Pos() {
     ? `/api/store/${tenant.slug}/logo`
     : '';
   const tenantSettings = settingsOf(tenant);
+  const deliveryStatuses = [
+    'Packed',
+    'Out for Delivery',
+    'Delivered',
+    'Failed Delivery',
+    'Returned',
+  ];
+  const deliveryKeyForOrder = (order: Order) => {
+    if (order.deliveryMethod === 'external_courier')
+      return order.deliveryProvider.trim()
+        ? `external:${order.deliveryProvider.trim().toLowerCase()}`
+        : 'unassigned';
+    return order.driverId ? `internal:${order.driverId}` : 'unassigned';
+  };
+  const deliveryKeyForTarget = (target: SettlementTarget) =>
+    target.method === 'external_courier'
+      ? `external:${target.provider.trim().toLowerCase()}`
+      : `internal:${target.driverId}`;
+  const deliveryOrders = all.filter((o) => deliveryStatuses.includes(o.status));
+  const deliveryTargetMap = new Map<
+    string,
+    {
+      key: string;
+      label: string;
+      method: 'internal_driver' | 'external_courier' | 'unassigned';
+      driverId: string | null;
+      provider: string;
+      expected: number;
+      count: number;
+    }
+  >();
+  for (const target of settlements.data?.targets || []) {
+    const key = deliveryKeyForTarget(target);
+    deliveryTargetMap.set(key, { key, ...target });
+  }
+  for (const order of deliveryOrders) {
+    const key = deliveryKeyForOrder(order);
+    if (deliveryTargetMap.has(key)) continue;
+    if (key === 'unassigned') {
+      deliveryTargetMap.set(key, {
+        key,
+        label: 'Unassigned delivery',
+        method: 'unassigned',
+        driverId: null,
+        provider: '',
+        expected: 0,
+        count: deliveryOrders.filter((o) => deliveryKeyForOrder(o) === key)
+          .length,
+      });
+      continue;
+    }
+    const driver = team.data?.find((member) => member.id === order.driverId);
+    deliveryTargetMap.set(key, {
+      key,
+      label:
+        order.deliveryMethod === 'external_courier'
+          ? order.deliveryProvider
+          : driver?.name || 'Internal driver',
+      method: order.deliveryMethod,
+      driverId: order.driverId,
+      provider: order.deliveryProvider,
+      expected: 0,
+      count: deliveryOrders.filter((o) => deliveryKeyForOrder(o) === key)
+        .length,
+    });
+  }
+  const deliveryFilterOptions = [
+    {
+      key: 'all',
+      label: 'All deliveries',
+      method: 'unassigned' as const,
+      driverId: null,
+      provider: '',
+      expected: Array.from(deliveryTargetMap.values()).reduce(
+        (sum, target) => sum + target.expected,
+        0,
+      ),
+      count: deliveryOrders.length,
+    },
+    ...Array.from(deliveryTargetMap.values()).sort((a, b) =>
+      a.label.localeCompare(b.label),
+    ),
+  ];
+  const activeDeliveryFilter = deliveryFilterOptions.some(
+    (option) => option.key === deliveryFilter,
+  )
+    ? deliveryFilter
+    : 'all';
+  const selectedDeliveryTarget =
+    deliveryFilterOptions.find((option) => option.key === activeDeliveryFilter) ||
+    deliveryFilterOptions[0];
+  const selectedSettlementTarget =
+    selectedDeliveryTarget?.method === 'internal_driver' ||
+    selectedDeliveryTarget?.method === 'external_courier'
+      ? {
+          method: selectedDeliveryTarget.method,
+          driverId: selectedDeliveryTarget.driverId,
+          provider: selectedDeliveryTarget.provider,
+        }
+      : null;
+  const visible = all.filter((o) => {
+    const matchesDelivery =
+      view !== 'Delivery' ||
+      (deliveryStatuses.includes(o.status) &&
+        (activeDeliveryFilter === 'all' ||
+          deliveryKeyForOrder(o) === activeDeliveryFilter));
+    const matchesStatus =
+      view === 'Delivery' || filter === 'All orders' || o.status === filter;
+    const matchesSearch = `${o.reference} ${o.customer} ${o.phone}`
+      .toLowerCase()
+      .includes(search.toLowerCase());
+    return matchesDelivery && matchesStatus && matchesSearch;
+  });
   const metrics = [
     [
       'New orders',
@@ -335,6 +440,7 @@ export default function Pos() {
   const go = (v: View) => {
     setView(v);
     setFilter('All orders');
+    setDeliveryFilter('all');
     setSearch('');
     setError('');
   };
@@ -573,22 +679,57 @@ export default function Pos() {
                   )}
                 </div>
               </div>
-              <div className="filter-pills">
-                {['All orders', ...statuses].map((s) => (
-                  <button
-                    className={filter === s ? 'active' : ''}
-                    key={s}
-                    onClick={() => setFilter(s)}
-                  >
-                    {s}
+              {view === 'Delivery' ? (
+                <>
+                  <div className="filter-pills delivery-filters">
+                    {deliveryFilterOptions.map((option) => (
+                      <button
+                        className={
+                          activeDeliveryFilter === option.key ? 'active' : ''
+                        }
+                        key={option.key}
+                        onClick={() => setDeliveryFilter(option.key)}
+                        type="button"
+                      >
+                        {option.label}
+                        <span>{option.count}</span>
+                        <strong>{money(option.expected)}</strong>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="delivery-return-summary">
+                    <strong>
+                      {selectedDeliveryTarget?.label || 'All deliveries'}
+                    </strong>
                     <span>
-                      {s === 'All orders'
-                        ? all.length
-                        : all.filter((o) => o.status === s).length}
+                      {money(selectedDeliveryTarget?.expected || 0)} expected
+                      COD return
                     </span>
-                  </button>
-                ))}
-              </div>
+                    <small>
+                      Internal deliveries include delivery fees. External
+                      couriers exclude delivery fees.
+                    </small>
+                  </div>
+                </>
+              ) : (
+                <div className="filter-pills">
+                  {['All orders', ...statuses].map((s) => (
+                    <button
+                      className={filter === s ? 'active' : ''}
+                      key={s}
+                      onClick={() => setFilter(s)}
+                      type="button"
+                    >
+                      {s}
+                      <span>
+                        {s === 'All orders'
+                          ? all.length
+                          : all.filter((o) => o.status === s).length}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className="table-toolbar">
                 <div className="search-wrap">
                   <Search />
@@ -618,6 +759,7 @@ export default function Pos() {
                   data={settlements.data}
                   deliveryProviders={tenantSettings.deliveryProviders}
                   error={settlements.error}
+                  selectedTarget={selectedSettlementTarget}
                   refresh={async () => {
                     await settlements.refresh();
                     refresh();
@@ -1598,11 +1740,19 @@ function SettlementPanel({
   data,
   deliveryProviders,
   error,
+  selectedTarget,
   refresh,
 }: {
   data: SettlementData | null;
   deliveryProviders: string[];
   error: string;
+  selectedTarget:
+    | {
+        method: 'internal_driver' | 'external_courier';
+        driverId: string | null;
+        provider: string;
+      }
+    | null;
   refresh: () => Promise<void>;
 }) {
   const team = useResource<User[]>('team', { intervalMs: 30000 });
@@ -1611,8 +1761,6 @@ function SettlementPanel({
     ),
     [driverId, setDriverId] = useState('none'),
     [provider, setProvider] = useState(''),
-    [periodStart, setPeriodStart] = useState(''),
-    [periodEnd, setPeriodEnd] = useState(''),
     [actual, setActual] = useState(''),
     [busy, setBusy] = useState(false),
     [localError, setLocalError] = useState(''),
@@ -1631,12 +1779,15 @@ function SettlementPanel({
         .filter(Boolean),
     ]),
   );
-  const toIso = (date: string, end = false) =>
-    date
-      ? new Date(
-          `${date}T${end ? '23:59:59.999' : '00:00:00.000'}`,
-        ).toISOString()
-      : null;
+  const selectedMethod = selectedTarget?.method;
+  const selectedDriverId = selectedTarget?.driverId;
+  const selectedProvider = selectedTarget?.provider;
+  useEffect(() => {
+    if (!selectedMethod) return;
+    setMethod(selectedMethod);
+    setDriverId(selectedDriverId || 'none');
+    setProvider(selectedProvider || '');
+  }, [selectedMethod, selectedDriverId, selectedProvider]);
   return (
     <div className="panel">
       <div className="panel-head">
@@ -1665,8 +1816,6 @@ function SettlementPanel({
                 method,
                 driverId: method === 'internal_driver' ? driverId : null,
                 provider: method === 'external_courier' ? provider : '',
-                periodStart: toIso(periodStart),
-                periodEnd: toIso(periodEnd, true),
                 actual: Math.round(Number(actual) * 100),
               });
               setActual('');
@@ -1717,20 +1866,6 @@ function SettlementPanel({
                 off an order to an external courier first.
               </small>
             )}
-            <Field label="Period start">
-              <input
-                type="date"
-                value={periodStart}
-                onChange={(e) => setPeriodStart(e.target.value)}
-              />
-            </Field>
-            <Field label="Period end">
-              <input
-                type="date"
-                value={periodEnd}
-                onChange={(e) => setPeriodEnd(e.target.value)}
-              />
-            </Field>
             <Field label="Actual returned ($)">
               <input
                 type="number"
