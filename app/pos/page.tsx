@@ -2130,6 +2130,7 @@ function ManualOrder({
             settings={settingsOf(tenant)}
             lines={lines}
             endpoint="orders"
+            allowDiscount
             onComplete={(d) => {
               setDone(d);
               onSaved();

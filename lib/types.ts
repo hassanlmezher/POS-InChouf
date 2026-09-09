@@ -159,6 +159,8 @@ export interface Order {
   payment: string;
   paymentMethod: string;
   subtotal: number;
+  discountPercent: number;
+  discountAmount: number;
   deliveryFee: number;
   total: number;
   notes: string;

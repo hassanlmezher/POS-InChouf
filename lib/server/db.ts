@@ -42,6 +42,8 @@ const keyMap: Record<string, string> = {
   customfields: 'customFields',
   freeabove: 'freeAbove',
   paymentmethod: 'paymentMethod',
+  discountpercent: 'discountPercent',
+  discountamount: 'discountAmount',
   deliveryfee: 'deliveryFee',
   deliverystatus: 'deliveryStatus',
   deliverymethod: 'deliveryMethod',

@@ -1456,6 +1456,9 @@ input.search-input {
   padding: 9px 0;
   font-size: 14px;
 }
+.order-total.discount {
+  color: #7443c5;
+}
 .order-total.final {
   border-top: 1px solid #e6deee;
   font-weight: 650;

@@ -108,6 +108,8 @@ export const orders = pgTable(
     payment: text('payment').notNull().default('Unpaid'),
     paymentMethod: text('paymentmethod').notNull().default('Cash on delivery'),
     subtotal: integer('subtotal').notNull(),
+    discountPercent: integer('discountpercent').notNull().default(0),
+    discountAmount: integer('discountamount').notNull().default(0),
     deliveryFee: integer('deliveryfee').notNull(),
     total: integer('total').notNull(),
     notes: text('notes').notNull().default(''),

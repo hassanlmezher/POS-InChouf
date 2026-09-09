@@ -765,6 +765,44 @@ void test('checkout reserves stock atomically and idempotency prevents duplicate
   );
 });
 
+void test('staff-created orders can apply a percentage discount', async () => {
+  const h = await setup();
+  const input = await checkout(h);
+  const blocked = await h.request('store/internal-demo/orders', 'POST', {
+    ...input,
+    idempotency: crypto.randomUUID(),
+    discountPercent: 10,
+  });
+  assert.equal(blocked.status, 400, await blocked.text());
+
+  const response = await h.request(
+    'orders',
+    'POST',
+    {
+      ...input,
+      idempotency: crypto.randomUUID(),
+      discountPercent: 10,
+    },
+    h.cookie,
+  );
+  const text = await response.text();
+  assert.equal(response.status, 201, text);
+  const id = (JSON.parse(text) as { id: string }).id;
+  const order = (await h.get<{
+    subtotal: number;
+    discountPercent: number;
+    discountAmount: number;
+    deliveryFee: number;
+    total: number;
+  }>('SELECT subtotal,discountPercent,discountAmount,deliveryFee,total FROM orders WHERE id=?', id))!;
+  assert.equal(order.discountPercent, 10);
+  assert.equal(order.discountAmount, Math.round(order.subtotal * 0.1));
+  assert.equal(
+    order.total,
+    order.subtotal - order.discountAmount + order.deliveryFee,
+  );
+});
+
 void test('customer search/profile are tenant scoped and order exports require manager roles', async () => {
   const h = await setup();
   await h.request('store/internal-demo/orders', 'POST', await checkout(h));
@@ -987,7 +1025,7 @@ void test('cash settlements calculate variance, update balanced COD orders and p
         provider: 'Fleet Co',
         expected: Number(
           (await h.get<{ subtotal: number }>(
-            "SELECT SUM(subtotal) subtotal FROM orders WHERE tenantId=? AND deliveryProvider='Fleet Co'",
+            "SELECT SUM(subtotal-discountAmount) subtotal FROM orders WHERE tenantId=? AND deliveryProvider='Fleet Co'",
             h.tenant,
           ))!.subtotal,
         ),
@@ -997,7 +1035,7 @@ void test('cash settlements calculate variance, update balanced COD orders and p
   );
   const expected = Number(
     (await h.get<{ subtotal: number }>(
-      "SELECT SUM(subtotal) subtotal FROM orders WHERE tenantId=? AND deliveryProvider='Fleet Co'",
+      "SELECT SUM(subtotal-discountAmount) subtotal FROM orders WHERE tenantId=? AND deliveryProvider='Fleet Co'",
       h.tenant,
     ))!.subtotal,
   );
@@ -1040,7 +1078,7 @@ void test('cash settlements calculate variance, update balanced COD orders and p
   await createDeliveredExternalOrder(h, 'Balanced Co');
   const balancedExpected = Number(
     (await h.get<{ subtotal: number }>(
-      "SELECT SUM(subtotal) subtotal FROM orders WHERE tenantId=? AND deliveryProvider='Balanced Co'",
+      "SELECT SUM(subtotal-discountAmount) subtotal FROM orders WHERE tenantId=? AND deliveryProvider='Balanced Co'",
       h.tenant,
     ))!.subtotal,
   );

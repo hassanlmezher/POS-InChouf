@@ -758,6 +758,7 @@ async function route(req: Request, env: Runtime): Promise<Response> {
           tenant!,
           await body(req, checkoutInput),
           user.name,
+          { allowDiscount: true },
         ),
         201,
       );
@@ -1164,7 +1165,7 @@ async function route(req: Request, env: Runtime): Promise<Response> {
         providerOptions: (
           await rows<{ provider: string }>(
             db,
-            "SELECT DISTINCT o.deliveryProvider AS provider FROM orders o LEFT JOIN settlementorders so ON so.tenantId=o.tenantId AND so.orderId=o.id WHERE o.tenantId=? AND o.deliveryMethod='external_courier' AND o.deliveryProvider!='' AND o.status='Delivered' AND o.paymentMethod='Cash on delivery' AND o.payment NOT IN ('Paid','Refunded') AND o.subtotal>o.cashCollected AND so.id IS NULL ORDER BY o.deliveryProvider LIMIT 100",
+            "SELECT DISTINCT o.deliveryProvider AS provider FROM orders o LEFT JOIN settlementorders so ON so.tenantId=o.tenantId AND so.orderId=o.id WHERE o.tenantId=? AND o.deliveryMethod='external_courier' AND o.deliveryProvider!='' AND o.status='Delivered' AND o.paymentMethod='Cash on delivery' AND o.payment NOT IN ('Paid','Refunded') AND (o.subtotal-o.discountAmount)>o.cashCollected AND so.id IS NULL ORDER BY o.deliveryProvider LIMIT 100",
             t,
           )
         ).map((row) => row.provider),
@@ -1178,10 +1179,10 @@ async function route(req: Request, env: Runtime): Promise<Response> {
             WHERE o.tenantId=? AND o.deliveryMethod='internal_driver' AND o.driverId IS NOT NULL AND o.status='Delivered' AND o.paymentMethod='Cash on delivery' AND o.payment NOT IN ('Paid','Refunded') AND o.total>o.cashCollected AND so.id IS NULL
             GROUP BY o.driverId
             UNION ALL
-            SELECT 'external_courier' AS method,NULL AS driverId,o.deliveryProvider AS provider,o.deliveryProvider AS label,SUM(o.subtotal-o.cashCollected) AS expected,COUNT(*) AS count
+            SELECT 'external_courier' AS method,NULL AS driverId,o.deliveryProvider AS provider,o.deliveryProvider AS label,SUM(o.subtotal-o.discountAmount-o.cashCollected) AS expected,COUNT(*) AS count
             FROM orders o
             LEFT JOIN settlementorders so ON so.tenantId=o.tenantId AND so.orderId=o.id
-            WHERE o.tenantId=? AND o.deliveryMethod='external_courier' AND o.deliveryProvider!='' AND o.status='Delivered' AND o.paymentMethod='Cash on delivery' AND o.payment NOT IN ('Paid','Refunded') AND o.subtotal>o.cashCollected AND so.id IS NULL
+            WHERE o.tenantId=? AND o.deliveryMethod='external_courier' AND o.deliveryProvider!='' AND o.status='Delivered' AND o.paymentMethod='Cash on delivery' AND o.payment NOT IN ('Paid','Refunded') AND (o.subtotal-o.discountAmount)>o.cashCollected AND so.id IS NULL
             GROUP BY o.deliveryProvider
           ) targets ORDER BY label LIMIT 200`,
           t,
@@ -1230,7 +1231,7 @@ async function route(req: Request, env: Runtime): Promise<Response> {
         args.push(input.method, input.provider || '');
       }
       filters.push(
-        "(CASE WHEN o.deliveryMethod='external_courier' THEN o.subtotal ELSE o.total END)>o.cashCollected",
+        "(CASE WHEN o.deliveryMethod='external_courier' THEN o.subtotal-o.discountAmount ELSE o.total END)>o.cashCollected",
       );
       const eligible = await rows<{
         id: string;
@@ -1238,7 +1239,7 @@ async function route(req: Request, env: Runtime): Promise<Response> {
         collected: number;
       }>(
         db,
-        `SELECT o.id,((CASE WHEN o.deliveryMethod='external_courier' THEN o.subtotal ELSE o.total END)-o.cashCollected) AS amount,o.cashCollected AS collected FROM orders o LEFT JOIN settlementorders so ON so.tenantId=o.tenantId AND so.orderId=o.id WHERE ${filters.join(' AND ')} ORDER BY o.createdAt`,
+        `SELECT o.id,((CASE WHEN o.deliveryMethod='external_courier' THEN o.subtotal-o.discountAmount ELSE o.total END)-o.cashCollected) AS amount,o.cashCollected AS collected FROM orders o LEFT JOIN settlementorders so ON so.tenantId=o.tenantId AND so.orderId=o.id WHERE ${filters.join(' AND ')} ORDER BY o.createdAt`,
         ...args,
       );
       if (!eligible.length)

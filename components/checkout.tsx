@@ -31,6 +31,7 @@ export default function Checkout({
   settings,
   lines,
   endpoint,
+  allowDiscount = false,
   onComplete,
 }: {
   products: Product[];
@@ -38,6 +39,7 @@ export default function Checkout({
   settings: Settings;
   lines: CartLine[];
   endpoint: string;
+  allowDiscount?: boolean;
   onComplete: (d: {
     trackingUrl: string;
     reference: string;
@@ -50,6 +52,7 @@ export default function Checkout({
     [address, setAddress] = useState(''),
     [zoneId, setZone] = useState(zones[0]?.id || ''),
     [notes, setNotes] = useState(''),
+    [discount, setDiscount] = useState(''),
     [payment, setPayment] = useState(
       settings.paymentOptions[0] || 'Cash on delivery',
     ),
@@ -73,8 +76,18 @@ export default function Checkout({
     );
     return sum + (v?.price ?? p.price) * quantity;
   }, 0);
+  const discountNumber = discount.trim() === '' ? 0 : Number(discount);
+  const discountIssue =
+    allowDiscount &&
+    (!Number.isFinite(discountNumber) ||
+      !Number.isInteger(discountNumber) ||
+      discountNumber < 0 ||
+      discountNumber > 100);
+  const discountPercent = allowDiscount && !discountIssue ? discountNumber : 0;
+  const discountAmount = Math.round((subtotal * discountPercent) / 100);
+  const discountedSubtotal = subtotal - discountAmount;
   const fee = zone
-    ? zone.freeAbove !== null && subtotal >= zone.freeAbove
+    ? zone.freeAbove !== null && discountedSubtotal >= zone.freeAbove
       ? 0
       : zone.fee
     : 0;
@@ -101,6 +114,10 @@ export default function Checkout({
           setError('Stock changed. Please review your bag before checkout.');
           return;
         }
+        if (discountIssue) {
+          setError('Enter a whole-number discount from 0 to 100.');
+          return;
+        }
         setBusy(true);
         setError('');
         try {
@@ -116,6 +133,7 @@ export default function Checkout({
             zoneId,
             notes,
             paymentMethod: payment,
+            discountPercent,
             idempotency,
             items: lines,
           });
@@ -203,27 +221,52 @@ export default function Checkout({
       <Field label="Order notes (optional)">
         <textarea value={notes} onChange={(e) => setNotes(e.target.value)} />
       </Field>
+      {allowDiscount && (
+        <Field label="Discount (%)">
+          <input
+            type="number"
+            min="0"
+            max="100"
+            step="1"
+            value={discount}
+            onChange={(e) => setDiscount(e.target.value)}
+            placeholder="0"
+            aria-invalid={discountIssue}
+          />
+          {discountIssue && (
+            <small className="danger-text">
+              Enter a whole-number discount from 0 to 100.
+            </small>
+          )}
+        </Field>
+      )}
       <div>
         <div className="order-total">
           <span>Subtotal</span>
           <span>{money(subtotal)}</span>
         </div>
+        {discountAmount > 0 && (
+          <div className="order-total discount">
+            <span>Discount ({discountPercent}%)</span>
+            <span>-{money(discountAmount)}</span>
+          </div>
+        )}
         <div className="order-total">
           <span>Delivery</span>
           <span>{money(fee)}</span>
         </div>
         <div className="order-total final">
           <span>Total</span>
-          <span>{money(subtotal + fee)}</span>
+          <span>{money(discountedSubtotal + fee)}</span>
         </div>
       </div>
       <ErrorBox error={error} />
       <Submit
         busy={busy}
         busyLabel="Placing order…"
-        disabled={!zone || !lines.length || !!stockIssue}
+        disabled={!zone || !lines.length || !!stockIssue || discountIssue}
       >
-        Place order · {money(subtotal + fee)}
+        Place order · {money(discountedSubtotal + fee)}
       </Submit>
       <small>
         Your details are shared with this shop to prepare and deliver your

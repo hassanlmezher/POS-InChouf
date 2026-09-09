@@ -101,6 +101,7 @@ export const checkoutInput = z
     zoneId: id,
     notes: text,
     paymentMethod: z.string().min(1).max(80),
+    discountPercent: z.number().int().min(0).max(100).default(0),
     idempotency: z.uuid(),
     items: z
       .array(

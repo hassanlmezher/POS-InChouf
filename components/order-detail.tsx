@@ -132,6 +132,12 @@ export default function OrderDetail({
                         <span>Subtotal</span>
                         <span>{money(o.subtotal)}</span>
                       </div>
+                      {o.discountAmount > 0 && (
+                        <div className="order-total discount">
+                          <span>Discount ({o.discountPercent}%)</span>
+                          <span>-{money(o.discountAmount)}</span>
+                        </div>
+                      )}
                       <div className="order-total">
                         <span>Delivery fee</span>
                         <span>{money(o.deliveryFee)}</span>

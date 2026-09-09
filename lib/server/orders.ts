@@ -36,6 +36,7 @@ export async function placeOrder(
   t: Tenant,
   input: z.infer<typeof checkoutInput>,
   actor = 'Customer',
+  options: { allowDiscount?: boolean } = {},
 ) {
   const db = database(env);
   const existing = await one<{ id: string }>(
@@ -93,10 +94,17 @@ export async function placeOrder(
     subtotal += price * item.quantity;
     lines.push({ ...item, price, name: p!.name });
   }
-  if (subtotal < zone!.minimum)
+  const discountPercent = input.discountPercent || 0;
+  if (discountPercent > 0 && !options.allowDiscount)
+    fail(400, 'Discounts are only available for staff-created orders.');
+  const discountAmount = Math.round((subtotal * discountPercent) / 100);
+  const discountedSubtotal = subtotal - discountAmount;
+  if (discountedSubtotal < zone!.minimum)
     fail(400, 'The minimum order amount for this zone has not been reached.');
   const fee =
-    zone!.freeAbove !== null && subtotal >= zone!.freeAbove ? 0 : zone!.fee;
+    zone!.freeAbove !== null && discountedSubtotal >= zone!.freeAbove
+      ? 0
+      : zone!.fee;
   const id = uid(),
     tracking = token(),
     date = now(),
@@ -104,7 +112,7 @@ export async function placeOrder(
   await db.batch([
     stmt(
       db,
-      'INSERT INTO orders (id,tenantId,reference,customer,phone,email,address,zoneId,paymentMethod,subtotal,deliveryFee,total,notes,trackingHash,idempotency,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      'INSERT INTO orders (id,tenantId,reference,customer,phone,email,address,zoneId,paymentMethod,subtotal,discountPercent,discountAmount,deliveryFee,total,notes,trackingHash,idempotency,createdAt,updatedAt) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
       id,
       t.id,
       reference,
@@ -115,8 +123,10 @@ export async function placeOrder(
       zone!.id,
       input.paymentMethod,
       subtotal,
+      discountPercent,
+      discountAmount,
       fee,
-      subtotal + fee,
+      discountedSubtotal + fee,
       input.notes,
       hash(tracking),
       input.idempotency,
@@ -144,7 +154,7 @@ export async function placeOrder(
     id,
     reference,
     trackingUrl: `/store/${t.slug}/order/${tracking}`,
-    total: subtotal + fee,
+    total: discountedSubtotal + fee,
   };
 }
 export async function orderDetail(
