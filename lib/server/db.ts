@@ -89,6 +89,28 @@ function normalizeRows<T>(rows: Record<string, unknown>[]): T[] {
   return rows.map((row) => normalizeRow<T>(row));
 }
 
+function supabaseDatabaseErrorHint(payload: unknown) {
+  const record =
+    payload && typeof payload === 'object'
+      ? (payload as Record<string, unknown>)
+      : {};
+  const code = typeof record.code === 'string' ? record.code : '';
+  const text = Object.values(record)
+    .filter((value) => typeof value === 'string')
+    .join(' ');
+  if (/INSUFFICIENT_STOCK|stock_nonnegative/i.test(text))
+    return 'INSUFFICIENT_STOCK';
+  if (/EMPLOYEE_LIMIT/i.test(text)) return 'EMPLOYEE_LIMIT';
+  if (code === '23505' || /duplicate key value|UNIQUE constraint/i.test(text))
+    return 'duplicate key value';
+  if (
+    /(discountpercent|discountamount)/i.test(text) &&
+    /(does not exist|schema cache|column)/i.test(text)
+  )
+    return 'SCHEMA_MISSING_ORDER_DISCOUNT_COLUMNS';
+  return code ? `Postgres ${code}` : '';
+}
+
 function createSupabaseDatabase(env: Runtime): Database {
   const endpoint = `${env.SUPABASE_URL.replace(/\/$/, '')}/rest/v1/rpc`;
   const headers = supabaseJsonHeaders(env.SUPABASE_SERVICE_ROLE_KEY);
@@ -98,8 +120,13 @@ function createSupabaseDatabase(env: Runtime): Database {
       headers,
       body: JSON.stringify(body),
     });
-    if (!response.ok)
-      throw new Error(`Supabase database request failed (${response.status}).`);
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      const hint = supabaseDatabaseErrorHint(payload);
+      throw new Error(
+        `Supabase database request failed (${response.status})${hint ? `: ${hint}` : ''}.`,
+      );
+    }
     return (await response.json()) as T;
   };
   const execute = async <T = unknown>(

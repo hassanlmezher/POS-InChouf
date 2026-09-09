@@ -765,6 +765,26 @@ void test('checkout reserves stock atomically and idempotency prevents duplicate
   );
 });
 
+void test('public checkout remains available before the discount migration is applied', async () => {
+  const h = await setup();
+  await h.run('ALTER TABLE orders DROP COLUMN discountpercent');
+  await h.run('ALTER TABLE orders DROP COLUMN discountamount');
+
+  const response = await h.request(
+    'store/internal-demo/orders',
+    'POST',
+    await checkout(h),
+  );
+  assert.equal(response.status, 201, await response.text());
+  assert.equal(
+    (await h.get<{ count: number }>(
+      'SELECT COUNT(*) AS count FROM orders WHERE tenantId=?',
+      h.tenant,
+    ))!.count,
+    1,
+  );
+});
+
 void test('staff-created orders can apply a percentage discount', async () => {
   const h = await setup();
   const input = await checkout(h);

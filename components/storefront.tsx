@@ -10,8 +10,6 @@ import {
   Plus,
   Minus,
   Menu,
-  Home,
-  MoreHorizontal,
 } from 'lucide-react';
 import {
   Sheet,
@@ -213,10 +211,22 @@ export default function Storefront({ slug }: { slug: string }) {
   ];
 
   const focusCollectionSearch = () => {
+    searchInputRef.current?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+    });
+    window.setTimeout(
+      () => searchInputRef.current?.focus({ preventScroll: true }),
+      300,
+    );
+  };
+
+  const showAllProducts = () => {
+    setSearch('');
+    setCategory('All products');
     document
       .getElementById('products')
       ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    window.setTimeout(() => searchInputRef.current?.focus(), 250);
   };
 
   return (
@@ -337,7 +347,7 @@ export default function Storefront({ slug }: { slug: string }) {
             <h2 className="sf-section-title">Shop by category</h2>
             <button
               className="sf-section-link"
-              onClick={() => setCategory('All products')}
+              onClick={showAllProducts}
               type="button"
             >
               View all <ArrowRight size={16} />
@@ -362,10 +372,7 @@ export default function Storefront({ slug }: { slug: string }) {
             <h2 className="sf-section-title">Featured products</h2>
             <button
               className="sf-section-link"
-              onClick={() => {
-                setSearch('');
-                setCategory('All products');
-              }}
+              onClick={showAllProducts}
               type="button"
             >
               See all <ArrowRight size={16} />
@@ -704,27 +711,6 @@ export default function Storefront({ slug }: { slug: string }) {
             : 'Could not copy the link automatically. Select the link below to copy it.'}
         </div>
       )}
-      <nav className="store-bottom-nav" aria-label="Store navigation">
-        <a href={`/store/${slug}`}>
-          <Home size={20} />
-          <span>Home</span>
-        </a>
-        <button onClick={focusCollectionSearch} type="button">
-          <Search size={20} />
-          <span>Search</span>
-        </button>
-        <button onClick={() => setCartOpen(true)} type="button">
-          <span className="bottom-bag-icon">
-            <ShoppingBag size={20} />
-            {count > 0 && <span>{count}</span>}
-          </span>
-          <span>Bag</span>
-        </button>
-        <a href="#store-info">
-          <MoreHorizontal size={20} />
-          <span>More</span>
-        </a>
-      </nav>
     </div>
   );
 }

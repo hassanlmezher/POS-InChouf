@@ -208,6 +208,14 @@ export async function handle(req: Request, env: Runtime): Promise<Response> {
       );
     if (/BODY_TOO_LARGE/.test(message))
       return json({ error: 'Request too large.' }, 413);
+    if (/SCHEMA_MISSING_ORDER_DISCOUNT_COLUMNS/.test(message))
+      return json(
+        {
+          error:
+            'Checkout is unavailable because a required database update has not been applied.',
+        },
+        503,
+      );
     const failedStage = e instanceof StageError ? e.stage : '';
     console.error(
       'OrderPilot request failed',
@@ -380,7 +388,10 @@ async function route(req: Request, env: Runtime): Promise<Response> {
     if (p[2] === 'orders' && method === 'POST') {
       await rateLimit(req, db, `checkout:${tenant.id}`, 20);
       return json(
-        await placeOrder(env, tenant, await body(req, checkoutInput)),
+        await stage(
+          'store.checkout_place_order',
+          placeOrder(env, tenant, await body(req, checkoutInput)),
+        ),
         201,
       );
     }
