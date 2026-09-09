@@ -1,0 +1,1 @@
+ALTER TABLE tenants ADD COLUMN IF NOT EXISTS billingphone text DEFAULT '' NOT NULL;

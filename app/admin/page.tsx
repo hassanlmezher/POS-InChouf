@@ -7,6 +7,7 @@ import {
   ShieldCheck,
   Search,
   X,
+  Phone,
 } from 'lucide-react';
 import {
   Brand,
@@ -56,6 +57,11 @@ export default function Admin() {
   if (subscriptionFilter !== 'all')
     params.set('subscription', subscriptionFilter);
   const r = useResource<{
+    unpaidTenants: (Tenant & {
+      orderCount: number;
+      userCount: number;
+      ownerEmail?: string;
+    })[];
     tenants: (Tenant & {
       orderCount: number;
       userCount: number;
@@ -78,7 +84,9 @@ export default function Admin() {
   );
   const [create, setCreate] = useState(false),
     [edit, setEdit] = useState<Tenant | null>(null),
-    [reset, setReset] = useState<Tenant | null>(null);
+    [reset, setReset] = useState<Tenant | null>(null),
+    [billingBusy, setBillingBusy] = useState(''),
+    [billingError, setBillingError] = useState('');
   if (me.loading) return <Loading />;
   if (me.error || me.data?.user.role !== 'super_admin')
     return (
@@ -91,6 +99,7 @@ export default function Admin() {
       </main>
     );
   const tenants = r.data?.tenants || [];
+  const unpaidTenants = r.data?.unpaidTenants || [];
   const total = r.data?.total ?? tenants.length;
   const summary = r.data?.summary ?? {
     activeCount: tenants.filter((t) => t.active && t.subscription !== 'suspended')
@@ -107,6 +116,21 @@ export default function Admin() {
     setEdit(null);
     setReset(null);
     void r.refresh();
+  };
+  const updateBilling = async (
+    tenant: Tenant,
+    action: 'paid' | 'cancelled',
+  ) => {
+    setBillingBusy(`${tenant.id}:${action}`);
+    setBillingError('');
+    try {
+      await api(`admin/tenants/${tenant.id}/billing`, 'POST', { action });
+      void r.refresh();
+    } catch (e) {
+      setBillingError(message(e));
+    } finally {
+      setBillingBusy('');
+    }
   };
   return (
     <div className="dashboard-shell">
@@ -170,6 +194,88 @@ export default function Admin() {
         </div>
         <ErrorBox error={r.error} retry={r.refresh} />
         <ErrorBox error={logoutError} />
+        <ErrorBox error={billingError} />
+        {unpaidTenants.length > 0 && (
+          <div className="panel unpaid-panel">
+            <div className="panel-head">
+              <div>
+                <h3>Unpaid businesses</h3>
+                <small>
+                  Trials or monthly subscriptions that reached their due date.
+                </small>
+              </div>
+              <span className="badge orange">{unpaidTenants.length} unpaid</span>
+            </div>
+            <Table className="op-table">
+              <TableHeader>
+                <TableRow>
+                  {['Business', 'Contact', 'Amount due', 'Due date', 'Actions'].map(
+                    (x) => (
+                      <TableHead key={x}>{x}</TableHead>
+                    ),
+                  )}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {unpaidTenants.map((t) => (
+                  <TableRow key={t.id}>
+                    <TableCell data-label="Business">
+                      <strong>{t.name}</strong>
+                      <small>{t.slug}.inchouf.com</small>
+                      {t.ownerEmail && <small>Owner: {t.ownerEmail}</small>}
+                    </TableCell>
+                    <TableCell data-label="Contact">
+                      {t.billingPhone ? (
+                        <a
+                          className="text-link"
+                          href={`tel:${t.billingPhone.replace(/[^\d+]/g, '')}`}
+                        >
+                          <Phone size={15} />
+                          {t.billingPhone}
+                        </a>
+                      ) : (
+                        <small>No phone saved</small>
+                      )}
+                    </TableCell>
+                    <TableCell data-label="Amount due">
+                      <strong>{money(t.price)}</strong>
+                      <small>{t.plan} monthly subscription</small>
+                    </TableCell>
+                    <TableCell data-label="Due date">
+                      <small>
+                        {(t.renewalDate || t.trialEnd)
+                          ? new Date(
+                              (t.renewalDate || t.trialEnd) as string,
+                            ).toLocaleDateString()
+                          : 'No due date'}
+                      </small>
+                    </TableCell>
+                    <TableCell data-label="Actions">
+                      <div className="inline-actions">
+                        <ActionButton
+                          className="button small"
+                          busy={billingBusy === `${t.id}:paid`}
+                          busyLabel="Saving…"
+                          onClick={() => updateBilling(t, 'paid')}
+                        >
+                          Paid
+                        </ActionButton>
+                        <ActionButton
+                          className="button secondary small"
+                          busy={billingBusy === `${t.id}:cancelled`}
+                          busyLabel="Saving…"
+                          onClick={() => updateBilling(t, 'cancelled')}
+                        >
+                          Cancelled
+                        </ActionButton>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
         <div className="panel">
           <div className="panel-head">
             <h3>Businesses</h3>
@@ -239,6 +345,7 @@ export default function Admin() {
                 {[
                   'Business',
                   'Subscription',
+                  'Phone',
                   'Team / orders',
                   'Health',
                   'Actions',
@@ -250,7 +357,7 @@ export default function Admin() {
             <TableBody>
               {tenants.map((t) => (
                 <TableRow key={t.id}>
-                  <TableCell>
+                  <TableCell data-label="Business">
                     <strong>{t.name}</strong>
                     <small>{t.slug}.inchouf.com</small>
                     {t.ownerEmail && <small>Owner: {t.ownerEmail}</small>}
@@ -258,21 +365,42 @@ export default function Admin() {
                       <span className="badge">Internal testing only</span>
                     )}
                   </TableCell>
-                  <TableCell>
+                  <TableCell data-label="Subscription">
                     <StatusBadge value={t.subscription} />
                     <small>
                       {t.plan} · {money(t.price)} / month
                     </small>
+                    {(t.renewalDate || t.trialEnd) && (
+                      <small>
+                        Due:{' '}
+                        {new Date(
+                          (t.renewalDate || t.trialEnd) as string,
+                        ).toLocaleDateString()}
+                      </small>
+                    )}
                   </TableCell>
-                  <TableCell>
+                  <TableCell data-label="Phone">
+                    {t.billingPhone ? (
+                      <a
+                        className="text-link"
+                        href={`tel:${t.billingPhone.replace(/[^\d+]/g, '')}`}
+                      >
+                        <Phone size={15} />
+                        {t.billingPhone}
+                      </a>
+                    ) : (
+                      <small>No phone saved</small>
+                    )}
+                  </TableCell>
+                  <TableCell data-label="Team / orders">
                     {t.userCount} users<small>{t.orderCount} orders</small>
                   </TableCell>
-                  <TableCell>
+                  <TableCell data-label="Health">
                     <span className={'badge ' + (t.active ? 'green' : 'red')}>
                       {t.active ? 'Enabled' : 'Disabled'}
                     </span>
                   </TableCell>
-                  <TableCell>
+                  <TableCell data-label="Actions">
                     <div className="inline-actions">
                       <button className="text-link" onClick={() => setEdit(t)}>
                         Manage
@@ -392,6 +520,7 @@ function CreateBusiness({
       name: '',
       slug: '',
       ownerName: '',
+      billingPhone: '',
       email: '',
       password: '',
     }),
@@ -440,6 +569,7 @@ function CreateBusiness({
           name: 'Business name',
           slug: 'Store slug',
           ownerName: 'Owner name',
+          billingPhone: 'Business billing phone',
           email: 'Owner email',
           password: 'Initial owner password',
         }).map(([k, label]) => (
@@ -454,10 +584,16 @@ function CreateBusiness({
           >
             <input
               type={
-                k === 'password' ? 'password' : k === 'email' ? 'email' : 'text'
+                k === 'password'
+                  ? 'password'
+                  : k === 'email'
+                    ? 'email'
+                    : k === 'billingPhone'
+                      ? 'tel'
+                      : 'text'
               }
               required
-              minLength={k === 'password' ? 12 : 2}
+              minLength={k === 'password' ? 12 : k === 'billingPhone' ? 5 : 2}
               value={data[k as keyof typeof data]}
               onChange={(e) => setData({ ...data, [k]: e.target.value })}
             />
@@ -511,6 +647,7 @@ function Subscription({
     [subscription, setSubscription] = useState(t.subscription),
     [plan, setPlan] = useState(t.plan),
     [price, setPrice] = useState(t.price / 100),
+    [billingPhone, setBillingPhone] = useState(t.billingPhone || ''),
     [start, setStart] = useState(t.trialStart?.slice(0, 10) || ''),
     [end, setEnd] = useState(t.trialEnd?.slice(0, 10) || ''),
     [renewal, setRenewal] = useState(t.renewalDate?.slice(0, 10) || ''),
@@ -530,6 +667,7 @@ function Subscription({
               subscription,
               plan,
               price: Math.round(price * 100),
+              billingPhone,
               trialStart: date(start),
               trialEnd: date(end),
               renewalDate: date(renewal),
@@ -560,6 +698,15 @@ function Subscription({
               step=".01"
               value={price}
               onChange={(e) => setPrice(+e.target.value)}
+            />
+          </Field>
+          <Field label="Billing phone">
+            <input
+              type="tel"
+              minLength={5}
+              value={billingPhone}
+              onChange={(e) => setBillingPhone(e.target.value)}
+              required
             />
           </Field>
           <Field label="Trial start">

@@ -28,6 +28,7 @@ export const tenantInput = z
       .regex(/^[a-z][a-z0-9-]{1,48}[a-z0-9]$/)
       .refine((x) => !reserved.includes(x)),
     ownerName: z.string().trim().min(2).max(100),
+    billingPhone: z.string().trim().min(5).max(40),
     email: z.email().transform((x) => x.toLowerCase()),
     password: z.string().min(12).max(128),
   })

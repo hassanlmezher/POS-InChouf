@@ -54,6 +54,7 @@ const keyMap: Record<string, string> = {
   trialend: 'trialEnd',
   renewaldate: 'renewalDate',
   suspendeddate: 'suspendedDate',
+  billingphone: 'billingPhone',
   createdat: 'createdAt',
   updatedat: 'updatedAt',
   contenttype: 'contentType',

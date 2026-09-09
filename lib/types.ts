@@ -82,6 +82,7 @@ export interface Tenant {
   trialEnd: string | null;
   renewalDate: string | null;
   suspendedDate: string | null;
+  billingPhone: string;
   settings: string;
   createdAt: string;
 }

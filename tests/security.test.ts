@@ -532,6 +532,7 @@ void test('super admin business search and logo creation stay authorized and ten
   form.set('name', 'Logo Test Business');
   form.set('slug', 'logo-test');
   form.set('ownerName', 'Logo Owner');
+  form.set('billingPhone', '+15551234567');
   form.set('email', 'logo-owner@example.com');
   form.set('password', 'logo-owner-password');
   form.set(
@@ -545,10 +546,21 @@ void test('super admin business search and logo creation stay authorized and ten
   const created = await h.request('admin/tenants', 'POST', form, adminCookie);
   assert.equal(created.status, 201, await created.text());
 
-  const tenant = (await h.get<{ id: string; settings: string }>(
-    'SELECT id,settings FROM tenants WHERE slug=?',
+  const tenant = (await h.get<{
+    id: string;
+    billingPhone: string;
+    settings: string;
+    trialStart: string;
+    trialEnd: string;
+  }>(
+    'SELECT id,billingPhone,settings,trialStart,trialEnd FROM tenants WHERE slug=?',
     'logo-test',
   ))!;
+  assert.equal(tenant.billingPhone, '+15551234567');
+  const trialLength =
+    new Date(tenant.trialEnd).getTime() - new Date(tenant.trialStart).getTime();
+  assert.ok(trialLength >= 27 * 86400000);
+  assert.ok(trialLength <= 32 * 86400000);
   const logoId = JSON.parse(tenant.settings).branding.logoId as string;
   assert.ok(logoId);
   assert.equal(h.blobs.has(`${tenant.id}/${logoId}`), true);
@@ -559,7 +571,7 @@ void test('super admin business search and logo creation stay authorized and ten
   assert.equal((await h.request('store/internal-demo/logo')).status, 404);
 
   const search = await h.request(
-    'admin/tenants?q=logo-test.inchouf.com',
+    'admin/tenants?q=5551234567',
     'GET',
     undefined,
     adminCookie,
@@ -586,6 +598,98 @@ void test('super admin business search and logo creation stay authorized and ten
     adminCookie,
   );
   assert.equal(((await cleared.json()) as { total: number }).total, 2);
+});
+
+void test('super admin billing marks expired trials unpaid, paid renews monthly, and cancelled disables', async () => {
+  const h = await setup();
+  const adminCookie = await cookieForRole(h, 'super_admin');
+  const yesterday = new Date(Date.now() - 86400000).toISOString();
+  await h.run(
+    'UPDATE tenants SET billingPhone=?,subscription=?,trialEnd=?,renewalDate=NULL,active=1 WHERE id=?',
+    '+15557654321',
+    'trial',
+    yesterday,
+    h.tenant,
+  );
+
+  const due = await h.request('admin/tenants', 'GET', undefined, adminCookie);
+  const dueText = await due.text();
+  assert.equal(due.status, 200, dueText);
+  const dueData = JSON.parse(dueText) as {
+    unpaidTenants: {
+      id: string;
+      slug: string;
+      subscription: string;
+      billingPhone: string;
+    }[];
+    tenants: { id: string; subscription: string }[];
+  };
+  assert.equal(dueData.unpaidTenants.length, 1);
+  assert.equal(dueData.unpaidTenants[0].slug, 'internal-demo');
+  assert.equal(dueData.unpaidTenants[0].subscription, 'past_due');
+  assert.equal(dueData.unpaidTenants[0].billingPhone, '+15557654321');
+
+  const paid = await h.request(
+    `admin/tenants/${h.tenant}/billing`,
+    'POST',
+    { action: 'paid' },
+    adminCookie,
+  );
+  assert.equal(paid.status, 200, await paid.text());
+  const renewed = (await h.get<{
+    active: number;
+    subscription: string;
+    renewalDate: string;
+  }>('SELECT active,subscription,renewalDate FROM tenants WHERE id=?', h.tenant))!;
+  assert.equal(renewed.active, 1);
+  assert.equal(renewed.subscription, 'active');
+  assert.ok(
+    new Date(renewed.renewalDate).getTime() - Date.now() >= 27 * 86400000,
+  );
+
+  const afterPaid = await h.request(
+    'admin/tenants',
+    'GET',
+    undefined,
+    adminCookie,
+  );
+  assert.equal(
+    ((await afterPaid.json()) as { unpaidTenants: unknown[] }).unpaidTenants
+      .length,
+    0,
+  );
+
+  await h.run(
+    'UPDATE tenants SET subscription=?,renewalDate=?,active=1 WHERE id=?',
+    'active',
+    yesterday,
+    h.tenant,
+  );
+  const overdueAgain = await h.request(
+    'admin/tenants',
+    'GET',
+    undefined,
+    adminCookie,
+  );
+  assert.equal(
+    ((await overdueAgain.json()) as { unpaidTenants: unknown[] }).unpaidTenants
+      .length,
+    1,
+  );
+
+  const cancelled = await h.request(
+    `admin/tenants/${h.tenant}/billing`,
+    'POST',
+    { action: 'cancelled' },
+    adminCookie,
+  );
+  assert.equal(cancelled.status, 200, await cancelled.text());
+  const disabled = (await h.get<{ active: number; subscription: string }>(
+    'SELECT active,subscription FROM tenants WHERE id=?',
+    h.tenant,
+  ))!;
+  assert.equal(disabled.active, 0);
+  assert.equal(disabled.subscription, 'cancelled');
 });
 
 void test('business owners can change only their own storefront logo', async () => {
@@ -714,6 +818,7 @@ void test('invalid business logos are rejected before tenant creation', async ()
   form.set('name', 'Bad Logo Business');
   form.set('slug', 'bad-logo');
   form.set('ownerName', 'Bad Logo Owner');
+  form.set('billingPhone', '+15550000000');
   form.set('email', 'bad-logo@example.com');
   form.set('password', 'bad-logo-password');
   form.set('logo', new File([Uint8Array.from([1, 2, 3])], 'bad.gif'));

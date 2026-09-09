@@ -140,6 +140,7 @@ async function tenantCreateBody(req: Request) {
     name: field('name'),
     slug: field('slug'),
     ownerName: field('ownerName'),
+    billingPhone: field('billingPhone'),
     email: field('email'),
     password: field('password'),
   };
@@ -162,6 +163,34 @@ async function generatedSku(db: ReturnType<typeof database>, tenantId: string) {
       return sku;
   }
   fail(503, 'Could not generate a unique product SKU. Try again.');
+}
+
+function addMonths(date: Date, months: number) {
+  const next = new Date(date);
+  const day = next.getUTCDate();
+  next.setUTCDate(1);
+  next.setUTCMonth(next.getUTCMonth() + months);
+  const lastDay = new Date(
+    Date.UTC(next.getUTCFullYear(), next.getUTCMonth() + 1, 0),
+  ).getUTCDate();
+  next.setUTCDate(Math.min(day, lastDay));
+  return next.toISOString();
+}
+
+async function markDueSubscriptions(db: ReturnType<typeof database>) {
+  await stmt(
+    db,
+    `UPDATE tenants SET subscription='past_due'
+     WHERE active=1
+       AND subscription IN ('trial','active')
+       AND (
+         (subscription='trial' AND trialEnd IS NOT NULL AND trialEnd<=?)
+         OR
+         (subscription='active' AND renewalDate IS NOT NULL AND renewalDate<=?)
+       )`,
+    now(),
+    now(),
+  ).run();
 }
 export async function handle(req: Request, env: Runtime): Promise<Response> {
   try {
@@ -474,6 +503,7 @@ async function route(req: Request, env: Runtime): Promise<Response> {
   if (p[0] === 'admin') {
     requireRole(user, ['super_admin']);
     if (p[1] === 'tenants' && method === 'GET') {
+      await markDueSubscriptions(db);
       const q = (url.searchParams.get('q') || '')
         .trim()
         .toLowerCase()
@@ -491,9 +521,9 @@ async function route(req: Request, env: Runtime): Promise<Response> {
       if (q) {
         const needle = `%${q}%`;
         where.push(
-          "(LOWER(t.name) LIKE ? OR LOWER(t.slug) LIKE ? OR LOWER(t.slug || '.inchouf.com') LIKE ? OR EXISTS (SELECT 1 FROM users u WHERE u.tenantId=t.id AND u.role='owner' AND LOWER(u.email) LIKE ?))",
+          "(LOWER(t.name) LIKE ? OR LOWER(t.slug) LIKE ? OR LOWER(t.slug || '.inchouf.com') LIKE ? OR LOWER(t.billingPhone) LIKE ? OR EXISTS (SELECT 1 FROM users u WHERE u.tenantId=t.id AND u.role='owner' AND LOWER(u.email) LIKE ?))",
         );
-        args.push(needle, needle, needle, needle);
+        args.push(needle, needle, needle, needle, needle);
       }
       if (
         ['trial', 'active', 'past_due', 'suspended', 'cancelled'].includes(
@@ -525,6 +555,10 @@ async function route(req: Request, env: Runtime): Promise<Response> {
         ...args,
       );
       return json({
+        unpaidTenants: await rows(
+          db,
+          `SELECT t.*, (SELECT email FROM users u WHERE u.tenantId=t.id AND u.role='owner' ORDER BY createdAt LIMIT 1) AS ownerEmail, (SELECT COUNT(*) FROM orders o WHERE o.tenantId=t.id) AS orderCount, (SELECT COUNT(*) FROM users u WHERE u.tenantId=t.id AND u.active=1) AS userCount FROM tenants t WHERE t.subscription='past_due' ORDER BY COALESCE(t.renewalDate,t.trialEnd,t.createdAt) ASC LIMIT 100`,
+        ),
         tenants: await rows(
           db,
           `SELECT t.*, (SELECT email FROM users u WHERE u.tenantId=t.id AND u.role='owner' ORDER BY createdAt LIMIT 1) AS ownerEmail, (SELECT COUNT(*) FROM orders o WHERE o.tenantId=t.id) AS orderCount, (SELECT COUNT(*) FROM users u WHERE u.tenantId=t.id AND u.active=1) AS userCount FROM tenants t ${whereSql} ORDER BY createdAt DESC LIMIT ? OFFSET ?`,
@@ -578,17 +612,19 @@ async function route(req: Request, env: Runtime): Promise<Response> {
           ...defaultSettings,
           branding: logoId ? { logoId } : undefined,
         };
+        const createdAt = now();
         await db.batch([
           stmt(
             db,
-            'INSERT INTO tenants (id,name,slug,trialStart,trialEnd,settings,createdAt) VALUES (?,?,?,?,?,?,?)',
+            'INSERT INTO tenants (id,name,slug,billingPhone,trialStart,trialEnd,settings,createdAt) VALUES (?,?,?,?,?,?,?,?)',
             id,
             input.name,
             input.slug,
-            now(),
-            new Date(Date.now() + 14 * 86400000).toISOString(),
+            input.billingPhone,
+            createdAt,
+            addMonths(new Date(createdAt), 1),
             JSON.stringify(settings),
-            now(),
+            createdAt,
           ),
           ...(logo
             ? [
@@ -641,6 +677,7 @@ async function route(req: Request, env: Runtime): Promise<Response> {
             ]),
             plan: z.string().min(1).max(50),
             price: z.number().int().min(0).max(10000000),
+            billingPhone: z.string().trim().min(5).max(40),
             trialStart: z.iso.datetime().nullable(),
             trialEnd: z.iso.datetime().nullable(),
             renewalDate: z.iso.datetime().nullable(),
@@ -652,11 +689,12 @@ async function route(req: Request, env: Runtime): Promise<Response> {
       await db.batch([
         stmt(
           db,
-          'UPDATE tenants SET active=?,subscription=?,plan=?,price=?,trialStart=?,trialEnd=?,renewalDate=?,suspendedDate=? WHERE id=?',
+          'UPDATE tenants SET active=?,subscription=?,plan=?,price=?,billingPhone=?,trialStart=?,trialEnd=?,renewalDate=?,suspendedDate=? WHERE id=?',
           Number(input.active),
           input.subscription,
           input.plan,
           input.price,
+          input.billingPhone,
           input.trialStart,
           input.trialEnd,
           input.renewalDate,
@@ -670,6 +708,45 @@ async function route(req: Request, env: Runtime): Promise<Response> {
           `${t!.slug}: ${input.subscription}`,
         ),
       ]);
+      return json({ ok: true });
+    }
+    if (p[1] === 'tenants' && p[2] && p[3] === 'billing' && method === 'POST') {
+      const input = await body(
+        req,
+        z.object({ action: z.enum(['paid', 'cancelled']) }).strict(),
+      );
+      const t = await one<Tenant>(db, 'SELECT * FROM tenants WHERE id=?', p[2]);
+      if (!t) fail(404, 'Business not found.');
+      const tenant = t!;
+      const current = now();
+      if (input.action === 'paid') {
+        await db.batch([
+          stmt(
+            db,
+            'UPDATE tenants SET active=1,subscription=?,renewalDate=?,suspendedDate=NULL WHERE id=?',
+            'active',
+            addMonths(new Date(current), 1),
+            p[2],
+          ),
+          platformEvent(
+            db,
+            user.name,
+            'Subscription payment recorded',
+            tenant.slug,
+          ),
+        ]);
+      } else {
+        await db.batch([
+          stmt(
+            db,
+            'UPDATE tenants SET active=0,subscription=?,suspendedDate=? WHERE id=?',
+            'cancelled',
+            current,
+            p[2],
+          ),
+          platformEvent(db, user.name, 'Subscription cancelled', tenant.slug),
+        ]);
+      }
       return json({ ok: true });
     }
     if (p[1] === 'tenants' && p[2] && p[3] === 'reset' && method === 'POST') {
