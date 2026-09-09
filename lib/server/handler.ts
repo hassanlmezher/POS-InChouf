@@ -42,6 +42,7 @@ import {
   type Tenant,
   type User,
   type Order,
+  type Settings,
   defaultSettings,
   settingsOf,
 } from '../types';
@@ -149,6 +150,36 @@ async function tenantCreateBody(req: Request) {
     rawLogo instanceof File && rawLogo.size ? await filePayload(rawLogo) : null;
   return { input: tenantInput.parse(values), logo };
 }
+
+function tenantBillingPhone(t: Tenant) {
+  try {
+    const settings = JSON.parse(t.settings) as Partial<
+      Settings & { billingPhone: string }
+    >;
+    return typeof settings.billingPhone === 'string'
+      ? settings.billingPhone
+      : '';
+  } catch {
+    return '';
+  }
+}
+
+function tenantWithBillingPhone<T extends Tenant>(t: T) {
+  return { ...t, billingPhone: tenantBillingPhone(t) };
+}
+
+function publicTenantSettings(t: Tenant) {
+  const settings = { ...settingsOf(t) } as Partial<
+    Settings & { billingPhone?: string }
+  >;
+  delete settings.billingPhone;
+  return JSON.stringify(settings);
+}
+
+function withBillingPhoneSettings(t: Tenant, billingPhone: string) {
+  return JSON.stringify({ ...settingsOf(t), billingPhone });
+}
+
 async function generatedSku(db: ReturnType<typeof database>, tenantId: string) {
   for (let attempt = 0; attempt < 5; attempt++) {
     const sku = `SKU-${uid().replace(/-/g, '').slice(0, 12).toUpperCase()}`;
@@ -387,7 +418,7 @@ async function route(req: Request, env: Runtime): Promise<Response> {
         tenant: {
           name: tenant.name,
           slug: tenant.slug,
-          settings: tenant.settings,
+          settings: publicTenantSettings(tenant),
         },
         products: await rows(
           db,
@@ -521,7 +552,7 @@ async function route(req: Request, env: Runtime): Promise<Response> {
       if (q) {
         const needle = `%${q}%`;
         where.push(
-          "(LOWER(t.name) LIKE ? OR LOWER(t.slug) LIKE ? OR LOWER(t.slug || '.inchouf.com') LIKE ? OR LOWER(t.billingPhone) LIKE ? OR EXISTS (SELECT 1 FROM users u WHERE u.tenantId=t.id AND u.role='owner' AND LOWER(u.email) LIKE ?))",
+          "(LOWER(t.name) LIKE ? OR LOWER(t.slug) LIKE ? OR LOWER(t.slug || '.inchouf.com') LIKE ? OR LOWER(t.settings) LIKE ? OR EXISTS (SELECT 1 FROM users u WHERE u.tenantId=t.id AND u.role='owner' AND LOWER(u.email) LIKE ?))",
         );
         args.push(needle, needle, needle, needle, needle);
       }
@@ -554,18 +585,24 @@ async function route(req: Request, env: Runtime): Promise<Response> {
         `SELECT SUM(CASE WHEN t.active=1 AND t.subscription!='suspended' THEN 1 ELSE 0 END) AS activeCount, SUM(CASE WHEN t.active=0 OR t.subscription='suspended' THEN 1 ELSE 0 END) AS suspendedCount, SUM(CASE WHEN t.active=1 AND t.subscription='active' THEN t.price ELSE 0 END) AS monthlyValue FROM tenants t ${whereSql}`,
         ...args,
       );
+      const unpaidTenants = await rows<
+        Tenant & { ownerEmail?: string; orderCount: number; userCount: number }
+      >(
+        db,
+        `SELECT t.*, (SELECT email FROM users u WHERE u.tenantId=t.id AND u.role='owner' ORDER BY createdAt LIMIT 1) AS ownerEmail, (SELECT COUNT(*) FROM orders o WHERE o.tenantId=t.id) AS orderCount, (SELECT COUNT(*) FROM users u WHERE u.tenantId=t.id AND u.active=1) AS userCount FROM tenants t WHERE t.subscription='past_due' ORDER BY COALESCE(t.renewalDate,t.trialEnd,t.createdAt) ASC LIMIT 100`,
+      );
+      const tenants = await rows<
+        Tenant & { ownerEmail?: string; orderCount: number; userCount: number }
+      >(
+        db,
+        `SELECT t.*, (SELECT email FROM users u WHERE u.tenantId=t.id AND u.role='owner' ORDER BY createdAt LIMIT 1) AS ownerEmail, (SELECT COUNT(*) FROM orders o WHERE o.tenantId=t.id) AS orderCount, (SELECT COUNT(*) FROM users u WHERE u.tenantId=t.id AND u.active=1) AS userCount FROM tenants t ${whereSql} ORDER BY createdAt DESC LIMIT ? OFFSET ?`,
+        ...args,
+        limit,
+        offset,
+      );
       return json({
-        unpaidTenants: await rows(
-          db,
-          `SELECT t.*, (SELECT email FROM users u WHERE u.tenantId=t.id AND u.role='owner' ORDER BY createdAt LIMIT 1) AS ownerEmail, (SELECT COUNT(*) FROM orders o WHERE o.tenantId=t.id) AS orderCount, (SELECT COUNT(*) FROM users u WHERE u.tenantId=t.id AND u.active=1) AS userCount FROM tenants t WHERE t.subscription='past_due' ORDER BY COALESCE(t.renewalDate,t.trialEnd,t.createdAt) ASC LIMIT 100`,
-        ),
-        tenants: await rows(
-          db,
-          `SELECT t.*, (SELECT email FROM users u WHERE u.tenantId=t.id AND u.role='owner' ORDER BY createdAt LIMIT 1) AS ownerEmail, (SELECT COUNT(*) FROM orders o WHERE o.tenantId=t.id) AS orderCount, (SELECT COUNT(*) FROM users u WHERE u.tenantId=t.id AND u.active=1) AS userCount FROM tenants t ${whereSql} ORDER BY createdAt DESC LIMIT ? OFFSET ?`,
-          ...args,
-          limit,
-          offset,
-        ),
+        unpaidTenants: unpaidTenants.map(tenantWithBillingPhone),
+        tenants: tenants.map(tenantWithBillingPhone),
         total: Number(total?.count || 0),
         summary: {
           activeCount: Number(summary?.activeCount || 0),
@@ -610,17 +647,17 @@ async function route(req: Request, env: Runtime): Promise<Response> {
       try {
         const settings = {
           ...defaultSettings,
+          billingPhone: input.billingPhone,
           branding: logoId ? { logoId } : undefined,
         };
         const createdAt = now();
         await db.batch([
           stmt(
             db,
-            'INSERT INTO tenants (id,name,slug,billingPhone,trialStart,trialEnd,settings,createdAt) VALUES (?,?,?,?,?,?,?,?)',
+            'INSERT INTO tenants (id,name,slug,trialStart,trialEnd,settings,createdAt) VALUES (?,?,?,?,?,?,?)',
             id,
             input.name,
             input.slug,
-            input.billingPhone,
             createdAt,
             addMonths(new Date(createdAt), 1),
             JSON.stringify(settings),
@@ -686,15 +723,16 @@ async function route(req: Request, env: Runtime): Promise<Response> {
       );
       const t = await one<Tenant>(db, 'SELECT * FROM tenants WHERE id=?', p[2]);
       if (!t) fail(404, 'Business not found.');
+      const settings = withBillingPhoneSettings(t!, input.billingPhone);
       await db.batch([
         stmt(
           db,
-          'UPDATE tenants SET active=?,subscription=?,plan=?,price=?,billingPhone=?,trialStart=?,trialEnd=?,renewalDate=?,suspendedDate=? WHERE id=?',
+          'UPDATE tenants SET active=?,subscription=?,plan=?,price=?,settings=?,trialStart=?,trialEnd=?,renewalDate=?,suspendedDate=? WHERE id=?',
           Number(input.active),
           input.subscription,
           input.plan,
           input.price,
-          input.billingPhone,
+          settings,
           input.trialStart,
           input.trialEnd,
           input.renewalDate,

@@ -548,15 +548,14 @@ void test('super admin business search and logo creation stay authorized and ten
 
   const tenant = (await h.get<{
     id: string;
-    billingPhone: string;
     settings: string;
     trialStart: string;
     trialEnd: string;
   }>(
-    'SELECT id,billingPhone,settings,trialStart,trialEnd FROM tenants WHERE slug=?',
+    'SELECT id,settings,trialStart,trialEnd FROM tenants WHERE slug=?',
     'logo-test',
   ))!;
-  assert.equal(tenant.billingPhone, '+15551234567');
+  assert.equal(JSON.parse(tenant.settings).billingPhone, '+15551234567');
   const trialLength =
     new Date(tenant.trialEnd).getTime() - new Date(tenant.trialStart).getTime();
   assert.ok(trialLength >= 27 * 86400000);
@@ -568,6 +567,16 @@ void test('super admin business search and logo creation stay authorized and ten
   const logo = await h.request('store/logo-test/logo');
   assert.equal(logo.status, 200, await logo.text());
   assert.equal(logo.headers.get('content-type'), 'image/png');
+  const storefront = await h.request('store/logo-test');
+  const storefrontText = await storefront.text();
+  assert.equal(storefront.status, 200, storefrontText);
+  const storefrontData = JSON.parse(storefrontText) as {
+    tenant: { settings: string };
+  };
+  assert.equal(
+    JSON.parse(storefrontData.tenant.settings).billingPhone,
+    undefined,
+  );
   assert.equal((await h.request('store/internal-demo/logo')).status, 404);
 
   const search = await h.request(
@@ -604,9 +613,16 @@ void test('super admin billing marks expired trials unpaid, paid renews monthly,
   const h = await setup();
   const adminCookie = await cookieForRole(h, 'super_admin');
   const yesterday = new Date(Date.now() - 86400000).toISOString();
+  const current = (await h.get<{ settings: string }>(
+    'SELECT settings FROM tenants WHERE id=?',
+    h.tenant,
+  ))!;
   await h.run(
-    'UPDATE tenants SET billingPhone=?,subscription=?,trialEnd=?,renewalDate=NULL,active=1 WHERE id=?',
-    '+15557654321',
+    'UPDATE tenants SET settings=?,subscription=?,trialEnd=?,renewalDate=NULL,active=1 WHERE id=?',
+    JSON.stringify({
+      ...JSON.parse(current.settings),
+      billingPhone: '+15557654321',
+    }),
     'trial',
     yesterday,
     h.tenant,
