@@ -409,6 +409,7 @@ void test('tenant isolation covers catalog, orders, storefronts and settings', a
     (await h.get<{ settings: string }>('SELECT settings FROM tenants WHERE id=?', h.tenant))!
       .settings,
   );
+  assert.equal(tenantSettings.storefront.template, 'default');
   tenantSettings.branding = { logoId: 'existing-logo' };
   await h.run(
     'UPDATE tenants SET settings=? WHERE id=?',
@@ -507,6 +508,22 @@ void test('tenant isolation covers catalog, orders, storefronts and settings', a
   assert.equal(publicSettings.contactPhone, '0000000000');
   assert.equal(publicSettings.address, 'Updated address');
   assert.equal(publicSettings.storefront.template, 'custom');
+  await h.run(
+    'INSERT INTO tenants (id,name,slug,createdAt) VALUES (?,?,?,?)',
+    'designed-tenant',
+    'Designed',
+    'designed',
+    date,
+  );
+  const designedStore = await h.request('store/designed');
+  const designedStoreText = await designedStore.text();
+  assert.equal(designedStore.status, 200, designedStoreText);
+  const designedStoreData = JSON.parse(designedStoreText) as {
+    tenant: { settings: string };
+  };
+  const designedSettings = JSON.parse(designedStoreData.tenant.settings);
+  assert.equal(designedSettings.storefront.template, 'luxury-watches');
+  assert.equal(designedSettings.storefront.theme.accent, '#9a6a2f');
   assert.equal(
     (
       await h.request(

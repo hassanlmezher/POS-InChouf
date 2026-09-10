@@ -101,7 +101,13 @@ export interface Settings {
   };
   storefront: StorefrontConfig;
 }
-export const storefrontTemplates = ['default', 'editorial', 'compact', 'custom'] as const;
+export const storefrontTemplates = [
+  'default',
+  'editorial',
+  'compact',
+  'luxury-watches',
+  'custom',
+] as const;
 export type StorefrontTemplate = (typeof storefrontTemplates)[number];
 export const storefrontSectionTypes = [
   'hero',
@@ -148,6 +154,40 @@ export const defaultStorefrontConfig: StorefrontConfig = {
   template: 'default',
   theme: {},
   sections: defaultStorefrontSections,
+};
+export const designedStorefrontConfig: StorefrontConfig = {
+  template: 'luxury-watches',
+  theme: {
+    accent: '#9a6a2f',
+    highlight: '#1d2430',
+    background: '#fbfaf7',
+    heroBackground: '#f6f2ea',
+    text: '#15171b',
+    muted: '#62656d',
+    dim: '#8c8375',
+    border: '#ded7ca',
+    cardBackground: '#ffffff',
+    cardBorder: '#e8e1d5',
+  },
+  sections: [
+    {
+      id: 'hero',
+      type: 'hero',
+      title: 'Designed Timepieces',
+      description:
+        'Precision watches selected with a collector’s eye for proportion, finish and quiet presence.',
+    },
+    { id: 'collection', type: 'categories', title: 'Collections' },
+    { id: 'products', type: 'featuredProducts', title: 'The current edit' },
+    {
+      id: 'store-promise',
+      type: 'banner',
+      title: 'Private appointments. Careful delivery.',
+      description:
+        'Every order is prepared directly by the boutique and tracked through a private link.',
+    },
+    { id: 'delivery', type: 'deliveryInfo', title: 'Delivery and concierge' },
+  ],
 };
 const isStorefrontTemplate = (value: unknown): value is StorefrontTemplate =>
   typeof value === 'string' &&
@@ -332,10 +372,19 @@ export const money = (cents: number) =>
   );
 export const settingsOf = (t: Tenant): Settings => {
   const stored = JSON.parse(t.settings) as Partial<Settings>;
+  const tenantDefaultStorefront =
+    t.slug === 'designed' ? designedStorefrontConfig : defaultStorefrontConfig;
   const storedStorefront =
     stored.storefront && typeof stored.storefront === 'object'
       ? (stored.storefront as Partial<StorefrontConfig>)
-      : defaultStorefrontConfig;
+      : tenantDefaultStorefront;
+  const storedTemplate = isStorefrontTemplate(storedStorefront.template)
+    ? storedStorefront.template
+    : tenantDefaultStorefront.template;
+  const template =
+    t.slug === 'designed' && storedTemplate === 'default'
+      ? designedStorefrontConfig.template
+      : storedTemplate;
   return {
     ...defaultSettings,
     tagline: stored.tagline ?? defaultSettings.tagline,
@@ -350,11 +399,18 @@ export const settingsOf = (t: Tenant): Settings => {
     currency: stored.currency ?? defaultSettings.currency,
     branding: stored.branding,
     storefront: {
-      template: isStorefrontTemplate(storedStorefront.template)
-        ? storedStorefront.template
-        : defaultStorefrontConfig.template,
-      theme: storefrontThemeOf(storedStorefront.theme),
-      sections: storefrontSectionsOf(storedStorefront.sections),
+      template,
+      theme: {
+        ...tenantDefaultStorefront.theme,
+        ...storefrontThemeOf(storedStorefront.theme),
+      },
+      sections:
+        t.slug === 'designed' &&
+        (!Array.isArray(storedStorefront.sections) ||
+          storedStorefront.sections.length === 0 ||
+          storedTemplate === 'default')
+          ? tenantDefaultStorefront.sections
+          : storefrontSectionsOf(storedStorefront.sections),
     },
   };
 };

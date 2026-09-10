@@ -610,6 +610,7 @@ export function StoreSettings({
                 { value: 'default', label: 'Default storefront' },
                 { value: 'editorial', label: 'Editorial storefront' },
                 { value: 'compact', label: 'Compact storefront' },
+                { value: 'luxury-watches', label: 'Luxury watches' },
                 { value: 'custom', label: 'Custom section layout' },
               ]}
             />
