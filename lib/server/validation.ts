@@ -1,8 +1,47 @@
 import { z } from 'zod';
 import { reserved } from './security';
+import { storefrontSectionTypes, storefrontTemplates } from '../types';
 export const id = z.string().min(1).max(100);
 const text = z.string().trim().max(2000);
 const cents = z.number().int().min(0).max(100000000);
+const cssColor = z
+  .string()
+  .trim()
+  .regex(/^#[0-9a-fA-F]{6}$/)
+  .optional();
+const storefrontConfigInput = z
+  .object({
+    template: z.enum(storefrontTemplates),
+    theme: z
+      .object({
+        accent: cssColor,
+        highlight: cssColor,
+        background: cssColor,
+        heroBackground: cssColor,
+        text: cssColor,
+        muted: cssColor,
+        dim: cssColor,
+        border: cssColor,
+        cardBackground: cssColor,
+        cardBorder: cssColor,
+      })
+      .strict(),
+    sections: z
+      .array(
+        z
+          .object({
+            id: z.string().trim().min(1).max(80).regex(/^[a-z0-9-]+$/),
+            type: z.enum(storefrontSectionTypes),
+            enabled: z.boolean().optional(),
+            title: z.string().trim().max(150).optional(),
+            description: text.optional(),
+            category: z.string().trim().max(80).optional(),
+          })
+          .strict(),
+      )
+      .max(30),
+  })
+  .strict();
 export const loginInput = z
   .object({
     email: z
@@ -182,6 +221,7 @@ export const settingsInput = z
       .object({ logoId: z.union([id, z.null()]) })
       .strict()
       .optional(),
+    storefront: storefrontConfigInput.optional(),
   })
   .strict();
 export async function body<T>(req: Request, schema: z.ZodType<T>): Promise<T> {

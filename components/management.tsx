@@ -27,9 +27,13 @@ import {
   type Tenant,
   type Settings,
   type Role,
+  type StorefrontSectionType,
+  defaultStorefrontSections,
   roleLabels,
   money,
   settingsOf,
+  storefrontSectionTypes,
+  storefrontTemplates,
 } from '@/lib/types';
 
 const lines = (value: string) =>
@@ -37,6 +41,23 @@ const lines = (value: string) =>
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean);
+const sectionLabels: Record<StorefrontSectionType, string> = {
+  hero: 'Hero',
+  categories: 'Categories',
+  featuredProducts: 'Products',
+  banner: 'Banner',
+  deliveryInfo: 'Delivery info',
+  contact: 'Contact',
+};
+const isStorefrontSectionType = (value: string): value is StorefrontSectionType =>
+  storefrontSectionTypes.includes(value as StorefrontSectionType);
+const sectionsFromLines = (value: string) =>
+  lines(value)
+    .filter(isStorefrontSectionType)
+    .map((type, index) => ({
+      id: type === 'featuredProducts' ? 'products' : `${type}-${index + 1}`,
+      type,
+    }));
 
 export function Zones() {
   const r = useResource<Zone[]>('zones');
@@ -424,6 +445,7 @@ export function StoreSettings({
     deliveryProviders: lines(s.deliveryProviders.join('\n')),
     currency: s.currency,
     branding: s.branding,
+    storefront: s.storefront,
   };
   return (
     <>
@@ -566,6 +588,95 @@ export function StoreSettings({
                 Remove logo
               </ActionButton>
             )}
+          </Field>
+          <div className="form-grid">
+            <Choice
+              label="Website layout"
+              value={s.storefront.template}
+              onChange={(template) =>
+                setS({
+                  ...s,
+                  storefront: {
+                    ...s.storefront,
+                    template: storefrontTemplates.includes(
+                      template as (typeof storefrontTemplates)[number],
+                    )
+                      ? (template as (typeof storefrontTemplates)[number])
+                      : 'default',
+                  },
+                })
+              }
+              options={[
+                { value: 'default', label: 'Default storefront' },
+                { value: 'editorial', label: 'Editorial storefront' },
+                { value: 'compact', label: 'Compact storefront' },
+                { value: 'custom', label: 'Custom section layout' },
+              ]}
+            />
+            <Field label="Accent color">
+              <input
+                type="color"
+                value={s.storefront.theme.accent || '#7142f4'}
+                onChange={(e) =>
+                  setS({
+                    ...s,
+                    storefront: {
+                      ...s.storefront,
+                      theme: { ...s.storefront.theme, accent: e.target.value },
+                    },
+                  })
+                }
+              />
+            </Field>
+            <Field label="Hero background">
+              <input
+                type="color"
+                value={s.storefront.theme.heroBackground || '#ffffff'}
+                onChange={(e) =>
+                  setS({
+                    ...s,
+                    storefront: {
+                      ...s.storefront,
+                      theme: {
+                        ...s.storefront.theme,
+                        heroBackground: e.target.value,
+                      },
+                    },
+                  })
+                }
+              />
+            </Field>
+          </div>
+          <Field
+            label="Website sections"
+            hint={`One per line: ${storefrontSectionTypes.join(', ')}.`}
+          >
+            <textarea
+              value={(s.storefront.sections.length
+                ? s.storefront.sections
+                : defaultStorefrontSections
+              )
+                .map((section) => section.type)
+                .join('\n')}
+              onChange={(e) =>
+                setS({
+                  ...s,
+                  storefront: {
+                    ...s.storefront,
+                    sections: sectionsFromLines(e.target.value),
+                  },
+                })
+              }
+            />
+            <small>
+              Active:{' '}
+              {(s.storefront.sections.length
+                ? s.storefront.sections
+                : defaultStorefrontSections
+              )
+                .map((section) => sectionLabels[section.type])
+                .join(' · ')}
+            </small>
           </Field>
           <ErrorBox error={error} />
           {success && (

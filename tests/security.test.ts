@@ -438,7 +438,66 @@ void test('tenant isolation covers catalog, orders, storefronts and settings', a
   );
   assert.deepEqual(savedSettings.deliveryProviders, ['Fleet Co']);
   assert.deepEqual(savedSettings.branding, { logoId: 'existing-logo' });
+  assert.equal(savedSettings.storefront.template, 'default');
   assert.equal(savedSettings.tagline, 'Updated storefront');
+  const customStorefront = await h.request(
+    'settings',
+    'PATCH',
+    {
+      tagline: 'Custom storefront',
+      description: 'Updated description',
+      contactEmail: '',
+      contactPhone: '0000000000',
+      address: 'Updated address',
+      paymentOptions: ['Cash on delivery'],
+      categories: ['General'],
+      deliveryProviders: ['Fleet Co'],
+      currency: 'USD',
+      storefront: {
+        template: 'custom',
+        theme: { accent: '#123456', heroBackground: '#f8fafc' },
+        sections: [
+          { id: 'hero', type: 'hero', title: 'Private collection' },
+          { id: 'products', type: 'featuredProducts' },
+          { id: 'contact', type: 'contact' },
+        ],
+      },
+    },
+    h.cookie,
+  );
+  assert.equal(customStorefront.status, 200, await customStorefront.text());
+  const customSettings = JSON.parse(
+    (await h.get<{ settings: string }>('SELECT settings FROM tenants WHERE id=?', h.tenant))!
+      .settings,
+  );
+  assert.equal(customSettings.storefront.template, 'custom');
+  assert.deepEqual(customSettings.storefront.sections.map((s: { type: string }) => s.type), [
+    'hero',
+    'featuredProducts',
+    'contact',
+  ]);
+  const unsafeTheme = await h.request(
+    'settings',
+    'PATCH',
+    {
+      tagline: 'Unsafe storefront',
+      description: 'Updated description',
+      contactEmail: '',
+      contactPhone: '0000000000',
+      address: 'Updated address',
+      paymentOptions: ['Cash on delivery'],
+      categories: ['General'],
+      deliveryProviders: ['Fleet Co'],
+      currency: 'USD',
+      storefront: {
+        template: 'custom',
+        theme: { accent: 'url(/api/files/other-logo)' },
+        sections: [],
+      },
+    },
+    h.cookie,
+  );
+  assert.equal(unsafeTheme.status, 400);
   const publicStore = await h.request('store/internal-demo');
   const publicStoreData = (await publicStore.json()) as {
     tenant: { settings: string };
@@ -447,6 +506,7 @@ void test('tenant isolation covers catalog, orders, storefronts and settings', a
   assert.equal(publicSettings.contactEmail, '');
   assert.equal(publicSettings.contactPhone, '0000000000');
   assert.equal(publicSettings.address, 'Updated address');
+  assert.equal(publicSettings.storefront.template, 'custom');
   assert.equal(
     (
       await h.request(

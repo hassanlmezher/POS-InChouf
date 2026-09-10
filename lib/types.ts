@@ -99,7 +99,112 @@ export interface Settings {
   branding?: {
     logoId: string | null;
   };
+  storefront: StorefrontConfig;
 }
+export const storefrontTemplates = ['default', 'editorial', 'compact', 'custom'] as const;
+export type StorefrontTemplate = (typeof storefrontTemplates)[number];
+export const storefrontSectionTypes = [
+  'hero',
+  'categories',
+  'featuredProducts',
+  'banner',
+  'deliveryInfo',
+  'contact',
+] as const;
+export type StorefrontSectionType = (typeof storefrontSectionTypes)[number];
+export interface StorefrontTheme {
+  accent?: string;
+  highlight?: string;
+  background?: string;
+  heroBackground?: string;
+  text?: string;
+  muted?: string;
+  dim?: string;
+  border?: string;
+  cardBackground?: string;
+  cardBorder?: string;
+}
+export interface StorefrontSection {
+  id: string;
+  type: StorefrontSectionType;
+  enabled?: boolean;
+  title?: string;
+  description?: string;
+  category?: string;
+}
+export interface StorefrontConfig {
+  template: StorefrontTemplate;
+  theme: StorefrontTheme;
+  sections: StorefrontSection[];
+}
+export const defaultStorefrontSections: StorefrontSection[] = [
+  { id: 'hero', type: 'hero' },
+  { id: 'collection', type: 'categories' },
+  { id: 'products', type: 'featuredProducts' },
+  { id: 'store-promise', type: 'banner' },
+  { id: 'delivery', type: 'deliveryInfo' },
+];
+export const defaultStorefrontConfig: StorefrontConfig = {
+  template: 'default',
+  theme: {},
+  sections: defaultStorefrontSections,
+};
+const isStorefrontTemplate = (value: unknown): value is StorefrontTemplate =>
+  typeof value === 'string' &&
+  storefrontTemplates.includes(value as StorefrontTemplate);
+const isStorefrontSectionType = (
+  value: unknown,
+): value is StorefrontSectionType =>
+  typeof value === 'string' &&
+  storefrontSectionTypes.includes(value as StorefrontSectionType);
+const isHexColor = (value: unknown): value is string =>
+  typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value);
+const storefrontThemeOf = (value: unknown): StorefrontTheme => {
+  if (!value || typeof value !== 'object') return {};
+  const input = value as Record<keyof StorefrontTheme, unknown>;
+  return Object.fromEntries(
+    ([
+      'accent',
+      'highlight',
+      'background',
+      'heroBackground',
+      'text',
+      'muted',
+      'dim',
+      'border',
+      'cardBackground',
+      'cardBorder',
+    ] as const)
+      .map((key) => [key, input[key]])
+      .filter((entry): entry is [keyof StorefrontTheme, string] =>
+        isHexColor(entry[1]),
+      ),
+  );
+};
+const storefrontSectionsOf = (value: unknown): StorefrontSection[] => {
+  if (!Array.isArray(value)) return defaultStorefrontConfig.sections;
+  const sections = value
+    .map((section, index): StorefrontSection | null => {
+      if (!section || typeof section !== 'object') return null;
+      const input = section as Record<string, unknown>;
+      if (!isStorefrontSectionType(input.type)) return null;
+      const id = typeof input.id === 'string' && input.id ? input.id : input.type;
+      const normalized: StorefrontSection = {
+        id: id.slice(0, 80) || `${input.type}-${index + 1}`,
+        type: input.type,
+      };
+      if (typeof input.enabled === 'boolean') normalized.enabled = input.enabled;
+      if (typeof input.title === 'string')
+        normalized.title = input.title.slice(0, 150);
+      if (typeof input.description === 'string')
+        normalized.description = input.description.slice(0, 2000);
+      if (typeof input.category === 'string')
+        normalized.category = input.category.slice(0, 80);
+      return normalized;
+    })
+    .filter((section): section is StorefrontSection => Boolean(section));
+  return sections.length ? sections : defaultStorefrontConfig.sections;
+};
 export const defaultSettings: Settings = {
   tagline: 'Thoughtful finds. Delivered to you.',
   description: 'Explore our collection and order directly from our shop.',
@@ -110,6 +215,7 @@ export const defaultSettings: Settings = {
   categories: ['General'],
   deliveryProviders: [],
   currency: 'USD',
+  storefront: defaultStorefrontConfig,
 };
 export interface Variant {
   name: string;
@@ -226,6 +332,10 @@ export const money = (cents: number) =>
   );
 export const settingsOf = (t: Tenant): Settings => {
   const stored = JSON.parse(t.settings) as Partial<Settings>;
+  const storedStorefront =
+    stored.storefront && typeof stored.storefront === 'object'
+      ? (stored.storefront as Partial<StorefrontConfig>)
+      : defaultStorefrontConfig;
   return {
     ...defaultSettings,
     tagline: stored.tagline ?? defaultSettings.tagline,
@@ -239,5 +349,12 @@ export const settingsOf = (t: Tenant): Settings => {
       stored.deliveryProviders ?? defaultSettings.deliveryProviders,
     currency: stored.currency ?? defaultSettings.currency,
     branding: stored.branding,
+    storefront: {
+      template: isStorefrontTemplate(storedStorefront.template)
+        ? storedStorefront.template
+        : defaultStorefrontConfig.template,
+      theme: storefrontThemeOf(storedStorefront.theme),
+      sections: storefrontSectionsOf(storedStorefront.sections),
+    },
   };
 };

@@ -1199,7 +1199,14 @@ async function route(req: Request, env: Runtime): Promise<Response> {
         t,
       );
       const currentBranding = tenant ? settingsOf(tenant).branding : undefined;
-      const { branding: requestedBranding, ...editableSettings } = i;
+      const currentStorefront = tenant
+        ? settingsOf(tenant).storefront
+        : defaultSettings.storefront;
+      const {
+        branding: requestedBranding,
+        storefront: requestedStorefront,
+        ...editableSettings
+      } = i;
       let branding = currentBranding;
       if (requestedBranding) {
         if (requestedBranding.logoId !== null) {
@@ -1220,7 +1227,11 @@ async function route(req: Request, env: Runtime): Promise<Response> {
         stmt(
           db,
           'UPDATE tenants SET settings=? WHERE id=?',
-          JSON.stringify({ ...editableSettings, branding }),
+          JSON.stringify({
+            ...editableSettings,
+            branding,
+            storefront: requestedStorefront ?? currentStorefront,
+          }),
           t,
         ),
         event(db, t, user.name, 'Storefront settings updated'),
