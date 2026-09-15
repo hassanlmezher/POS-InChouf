@@ -33,9 +33,11 @@ import {
   allow,
   requireRole,
   originGuard,
+  publicStoreSlug,
   validHost,
 } from './security';
 import { auth } from './supabase';
+import { ensureVarelysStore } from './varelys';
 import { placeOrder, orderDetail, updateOrder } from './orders';
 import { exportCSV } from '../csv';
 import {
@@ -412,6 +414,7 @@ async function route(req: Request, env: Runtime): Promise<Response> {
     return json({ ok: true }, 200, { 'Set-Cookie': cookie(req, '', 0) });
   }
   if (p[0] === 'store') {
+    if (p[1] === publicStoreSlug) await ensureVarelysStore(db);
     const tenant = await publicTenant(req, env, p[1] || '');
     if (p.length === 2 && method === 'GET') {
       return json({

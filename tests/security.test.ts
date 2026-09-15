@@ -545,6 +545,47 @@ void test('tenant isolation covers catalog, orders, storefronts and settings', a
   );
 });
 
+void test('Varelys public storefront self-heals old tenant availability state', async () => {
+  const h = await harness();
+  const host = 'https://varelysperfumes.inchouf.com';
+  const response = await h.request('store/varelysperfumes', 'GET', undefined, '', host);
+  const text = await response.text();
+  assert.equal(response.status, 200, text);
+  const data = JSON.parse(text) as {
+    tenant: { name: string; slug: string; settings: string };
+    products: unknown[];
+    zones: unknown[];
+  };
+  const settings = JSON.parse(data.tenant.settings) as {
+    paymentOptions: string[];
+    storefront: { template: string };
+  };
+  assert.equal(data.tenant.slug, 'varelysperfumes');
+  assert.equal(settings.storefront.template, 'varelys-perfumes');
+  assert.deepEqual(settings.paymentOptions, ['Cash on delivery']);
+  assert.ok(data.products.length > 0);
+  assert.ok(data.zones.length > 0);
+
+  await h.run(
+    "UPDATE tenants SET active=0, subscription='suspended' WHERE slug=?",
+    'varelysperfumes',
+  );
+  const repaired = await h.request(
+    'store/varelysperfumes',
+    'GET',
+    undefined,
+    '',
+    host,
+  );
+  assert.equal(repaired.status, 200, await repaired.text());
+  const tenant = await h.get<{ active: number; subscription: string }>(
+    'SELECT active,subscription FROM tenants WHERE slug=?',
+    'varelysperfumes',
+  );
+  assert.equal(tenant?.active, 1);
+  assert.equal(tenant?.subscription, 'active');
+});
+
 void test('PostgreSQL composite foreign keys reject cross-tenant relationships', async () => {
   const h = await setup();
   await h.run(

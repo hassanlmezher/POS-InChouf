@@ -279,7 +279,7 @@ export async function session(req: Request, env: Runtime) {
       user!.tenantId,
     );
     if (!t?.active || t.subscription === 'suspended')
-      fail(403, 'Your business is suspended. Contact InChouf.');
+      fail(403, 'Your business is suspended. Contact support.');
   }
   return user!;
 }
@@ -296,7 +296,7 @@ export async function publicTenant(req: Request, env: Runtime, slug: string) {
     slug,
     'suspended',
   );
-  if (!t) fail(404, 'This store is not available.');
+  if (!t) fail(404, 'Store not found.');
   return t!;
 }
 export async function rateLimit(

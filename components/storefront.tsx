@@ -13,10 +13,10 @@ export default function Storefront({ slug }: { slug: string }) {
   if (r.error || !r.data)
     return (
       <main className="section">
-        <h1>Store unavailable</h1>
+        <h1>Varelys Perfumes is almost ready.</h1>
         <ErrorBox error={r.error} retry={r.refresh} />
         <a className="button secondary" href="/">
-          Back to InChouf
+          Back to Varelys Perfumes
         </a>
       </main>
     );
