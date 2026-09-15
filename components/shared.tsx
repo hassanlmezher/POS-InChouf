@@ -113,16 +113,18 @@ export function Modal({
   open,
   onClose,
   children,
+  className,
 }: {
   title: string;
   description?: string;
   open: boolean;
   onClose: () => void;
   children: ReactNode;
+  className?: string;
 }) {
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="op-modal">
+      <DialogContent className={['op-modal', className].filter(Boolean).join(' ')}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>

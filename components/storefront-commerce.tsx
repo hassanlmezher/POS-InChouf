@@ -9,7 +9,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { ArrowRight, Minus, Plus } from 'lucide-react';
+import { ArrowRight, CheckCircle, Minus, Plus, Truck, X } from 'lucide-react';
 import {
   money,
   type CustomField,
@@ -230,6 +230,7 @@ export function useStorefrontCommerce({
     checkout,
     setCheckout,
     done,
+    setDone,
     copyFeedback,
     count,
     total,
@@ -251,6 +252,9 @@ export function StorefrontCommerceChrome({
 }: {
   commerce: StorefrontCommerce;
 }) {
+  const templateClass = commerce.settings.storefront.template
+    ? `commerce-${commerce.settings.storefront.template}`
+    : '';
   return (
     <>
       {commerce.selected && (
@@ -258,9 +262,10 @@ export function StorefrontCommerceChrome({
           product={commerce.selected}
           onClose={() => commerce.setSelected(null)}
           add={commerce.add}
+          templateClass={templateClass}
         />
       )}
-      <CartSheet commerce={commerce} />
+      <CartSheet commerce={commerce} templateClass={templateClass} />
       {commerce.copyFeedback && (
         <div
           className={`toast-message ${commerce.copyFeedback}`}
@@ -276,7 +281,14 @@ export function StorefrontCommerceChrome({
   );
 }
 
-function CartSheet({ commerce }: { commerce: StorefrontCommerce }) {
+function CartSheet({
+  commerce,
+  templateClass,
+}: {
+  commerce: StorefrontCommerce;
+  templateClass: string;
+}) {
+  const isVarelys = templateClass === 'commerce-varelys-perfumes';
   return (
     <Sheet
       open={commerce.cartOpen}
@@ -285,20 +297,25 @@ function CartSheet({ commerce }: { commerce: StorefrontCommerce }) {
         if (!open && !commerce.done) commerce.setCheckout(false);
       }}
     >
-      <SheetContent className="details-sheet">
+      <SheetContent className={['details-sheet', templateClass].filter(Boolean).join(' ')}>
         <div className="sheet-inner">
+          {isVarelys && (
+            <div className="vp-sheet-brand" aria-hidden="true">
+              <img src="/brand/varelys-perfumes-logo.png" alt="" />
+            </div>
+          )}
           <SheetHeader>
             <SheetTitle>
               {commerce.done
-                ? 'Order received.'
+                ? 'Order Placed Successfully!'
                 : commerce.checkout
-                  ? 'Delivery & checkout'
-                  : 'Your bag'}
+                  ? 'Shipping Information'
+                  : 'Your Cart'}
             </SheetTitle>
             <SheetDescription>
               {commerce.done
-                ? 'Save your private tracking link.'
-                : `${commerce.count} items, chosen by you.`}
+                ? 'Thank you for your purchase.'
+                : `${commerce.count} items`}
             </SheetDescription>
           </SheetHeader>
           <div style={{ marginTop: 28 }}>
@@ -333,24 +350,42 @@ function CartSheet({ commerce }: { commerce: StorefrontCommerce }) {
 function OrderComplete({ commerce }: { commerce: StorefrontCommerce }) {
   const done = commerce.done!;
   return (
-    <div className="form-stack">
+    <div className="form-stack order-complete-panel">
+      <CheckCircle className="order-complete-icon" size={72} />
+      <div>
+        <h3>Order Placed Successfully!</h3>
+        <p>
+          Thank you for your purchase. Your order <strong>#{done.reference}</strong>{' '}
+          has been received and is now being processed.
+        </p>
+      </div>
       <div className="success-box">
         {done.reference} · {money(done.total)}
       </div>
-      <p>
-        Your order is in the shop&apos;s queue. Copy this private link and save
-        it somewhere safe before tracking your order. You will need it to check
-        the order status later.
-      </p>
       <div className="tracking-save-note">
-        <strong>Save your link before you continue.</strong>
+        <strong>Save your private tracking link.</strong>
         <span>
           The link is private and is the only way to access your order status
           later.
         </span>
       </div>
+      <div className="order-complete-actions">
+        <a className="button" href={done.trackingUrl}>
+          View Order
+        </a>
+        <button
+          className="button secondary"
+          onClick={() => {
+            commerce.setDone(null);
+            commerce.setCartOpen(false);
+          }}
+          type="button"
+        >
+          Continue Shopping
+        </button>
+      </div>
       <button
-        className="button secondary"
+        className="button secondary copy-tracking-btn"
         onClick={commerce.copyTrackingLink}
         type="button"
       >
@@ -358,9 +393,16 @@ function OrderComplete({ commerce }: { commerce: StorefrontCommerce }) {
           ? 'Tracking link copied'
           : 'Copy tracking link'}
       </button>
-      <a className="button" href={done.trackingUrl}>
-        Track your order <ArrowRight size={16} />
-      </a>
+      <div className="delivery-note-card">
+        <Truck size={28} />
+        <div>
+          <strong>Fast Delivery</strong>
+          <span>
+            Your order will be delivered within 2-4 business days across
+            Lebanon.
+          </span>
+        </div>
+      </div>
       <small style={{ overflowWrap: 'anywhere' }}>
         {location.origin + done.trackingUrl}
       </small>
@@ -379,6 +421,14 @@ function CheckoutPanel({ commerce }: { commerce: StorefrontCommerce }) {
       >
         ← Back to bag
       </button>
+      <div className="vp-checkout-steps" aria-label="Checkout progress">
+        {['Shipping', 'Payment', 'Review'].map((step, index) => (
+          <div className={index === 0 ? 'active' : ''} key={step}>
+            <span>{index + 1}</span>
+            <small>{step}</small>
+          </div>
+        ))}
+      </div>
       <Checkout
         products={commerce.products}
         zones={commerce.zones}
@@ -403,6 +453,7 @@ function CartLines({ commerce }: { commerce: StorefrontCommerce }) {
           !isValidQuantity(line.quantity) ||
           quantity > max ||
           product.stock === 0;
+        const price = commerce.priceOf(line);
         return (
           <div className="cart-line" key={index}>
             <div className="cart-photo">
@@ -411,7 +462,7 @@ function CartLines({ commerce }: { commerce: StorefrontCommerce }) {
             <div>
               <h3>{product.name}</h3>
               <small>{line.variant}</small>
-              <strong>{money(commerce.priceOf(line))}</strong>
+              <strong>{money(price)}</strong>
               {overStock && (
                 <small className="danger-text">
                   Only {Math.max(0, max)} units available.
@@ -450,14 +501,16 @@ function CartLines({ commerce }: { commerce: StorefrontCommerce }) {
                 </button>
               </div>
             </div>
+            <strong className="cart-line-total">{money(price * quantity)}</strong>
             <button
-              className="text-link"
+              className="cart-remove"
+              aria-label={`Remove ${product.name}`}
               onClick={() =>
                 commerce.setCart(commerce.cart.filter((_, n) => n !== index))
               }
               type="button"
             >
-              Remove
+              <X size={15} />
             </button>
           </div>
         );
@@ -483,10 +536,12 @@ function ProductDialog({
   product,
   onClose,
   add,
+  templateClass,
 }: {
   product: Product;
   onClose: () => void;
   add: (line: CartLine) => void;
+  templateClass: string;
 }) {
   const variants = JSON.parse(product.variants) as Variant[],
     fields = JSON.parse(product.customFields) as CustomField[];
@@ -503,6 +558,7 @@ function ProductDialog({
       title={product.name}
       description={product.description}
       onClose={onClose}
+      className={templateClass}
     >
       <div className="product-detail-photo">
         <ProductImage src={product.image} name={product.name} />

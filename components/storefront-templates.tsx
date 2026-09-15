@@ -18,6 +18,7 @@ import {
   Home,
   Menu,
   Search,
+  Shield,
   ShieldCheck,
   ShoppingBag,
   SlidersHorizontal,
@@ -235,7 +236,7 @@ function VarelysPerfumesStorefront({
       <main>
         <section className="vp-hero" id={hero.id}>
           <div className="vp-hero-copy">
-            <h1>{hero.title || 'More Than A Fragrance A Feeling'}</h1>
+            <VarelysHeroTitle title={hero.title} />
             <p>
               {hero.description ||
                 commerce.settings.description ||
@@ -363,6 +364,20 @@ function VarelysPerfumesStorefront({
             <strong>{'Shop Men ->'}</strong>
           </button>
         </section>
+
+        <section className="vp-footer-promises" aria-label="Shopping benefits">
+          {[
+            [ShoppingBag, 'Top Fragrance Brands'],
+            [Truck, 'Fast Delivery Across Lebanon'],
+            [Shield, 'Secure & Easy Payment'],
+            [User, 'Trusted by 10,000+ Customers'],
+          ].map(([Icon, label]) => (
+            <div key={String(label)}>
+              <Icon size={24} />
+              <span>{String(label)}</span>
+            </div>
+          ))}
+        </section>
       </main>
 
       <nav className="vp-bottom-nav" aria-label="Mobile navigation">
@@ -390,6 +405,22 @@ function VarelysPerfumesStorefront({
 
       <StorefrontCommerceChrome commerce={commerce} />
     </div>
+  );
+}
+
+function VarelysHeroTitle({ title }: { title?: string }) {
+  const defaultTitle = 'More Than A Fragrance A Feeling';
+  const text = title || defaultTitle;
+  if (text.trim().toLowerCase() !== defaultTitle.toLowerCase())
+    return <h1>{text}</h1>;
+  return (
+    <h1>
+      More Than
+      <br />
+      A Fragrance
+      <br />
+      <em>A Feeling</em>
+    </h1>
   );
 }
 
