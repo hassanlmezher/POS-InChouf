@@ -41,13 +41,27 @@ async function authFetch<T>(
   const headers = supabaseJsonHeaders(key, init.headers);
   const res = await fetch(`${authBase(env)}${path}`, { ...init, headers });
   const text = await res.text();
-  const data = text ? JSON.parse(text) : null;
+  let data: Record<string, unknown> | null = null;
+  if (text) {
+    try {
+      const parsed = JSON.parse(text) as unknown;
+      data =
+        parsed && typeof parsed === 'object'
+          ? (parsed as Record<string, unknown>)
+          : null;
+    } catch {
+      throw new Error(
+        `Supabase Auth returned a non-JSON response (${res.status}). Check SUPABASE_URL and API keys.`,
+      );
+    }
+  }
   if (!res.ok) {
     const message =
-      data?.msg ||
-      data?.message ||
-      data?.error_description ||
-      data?.error ||
+      (typeof data?.msg === 'string' && data.msg) ||
+      (typeof data?.message === 'string' && data.message) ||
+      (typeof data?.error_description === 'string' &&
+        data.error_description) ||
+      (typeof data?.error === 'string' && data.error) ||
       'Supabase Auth request failed.';
     if (res.status === 401 || res.status === 400) fail(401, message);
     throw new Error(message);

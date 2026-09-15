@@ -3,8 +3,13 @@ import './globals.css';
 import { WorkingIndicator } from '@/components/shared';
 
 export const metadata: Metadata = {
-  title: 'VarelysPerfumes',
-  description: 'VarelysPerfumes customer site and admin workspace.',
+  title: 'Varelys Perfumes',
+  description: 'Varelys Perfumes customer site and admin workspace.',
+  icons: {
+    icon: '/brand/varelys-perfumes-logo.png',
+    shortcut: '/brand/varelys-perfumes-logo.png',
+    apple: '/brand/varelys-perfumes-logo.png',
+  },
 };
 
 export const viewport: Viewport = {

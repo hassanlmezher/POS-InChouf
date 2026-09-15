@@ -26,7 +26,12 @@ import {
 export function Brand() {
   return (
     <a className="brand" href="/">
-      <span className="brand-mark">V</span>VarelysPerfumes
+      <img
+        src="/brand/varelys-perfumes-logo.png"
+        alt="Varelys Perfumes"
+        className="brand-logo"
+      />
+      <span>Varelys Perfumes</span>
       <span className="brand-product">Admin</span>
     </a>
   );

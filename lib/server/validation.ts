@@ -1,6 +1,11 @@
 import { z } from 'zod';
 import { reserved } from './security';
 import { storefrontSectionTypes, storefrontTemplates } from '../types';
+export class InvalidJsonBodyError extends Error {
+  constructor() {
+    super('Invalid JSON.');
+  }
+}
 export const id = z.string().min(1).max(100);
 const text = z.string().trim().max(2000);
 const cents = z.number().int().min(0).max(100000000);
@@ -228,6 +233,11 @@ export const settingsInput = z
 export async function body<T>(req: Request, schema: z.ZodType<T>): Promise<T> {
   const value = await req.text();
   if (value.length > 100000) throw new Error('BODY_TOO_LARGE');
-  return schema.parse(JSON.parse(value));
+  try {
+    return schema.parse(JSON.parse(value));
+  } catch (e) {
+    if (e instanceof z.ZodError) throw e;
+    throw new InvalidJsonBodyError();
+  }
 }
 export { z };

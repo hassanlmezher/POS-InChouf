@@ -14,32 +14,32 @@ export default function Login() {
       <section className="login-story">
         <Brand />
         <div>
-          <div className="eyebrow">A LITTLE CLARITY GOES A LONG WAY</div>
+          <div className="eyebrow">VARELYS PERFUMES</div>
           <h1>
-            Good morning.
+            Manage every
             <br />
-            Let’s get things
+            scent, order,
             <br />
-            <span>moving.</span>
+            <span>and delivery.</span>
           </h1>
           <p>
-            A clear workspace for the people
+            A polished workspace for the perfume catalog
             <br />
-            behind every delivery.
+            and cash-on-delivery orders.
           </p>
           <div className="login-flow">
-            <span>Order</span>
+            <span>Catalog</span>
             <ArrowRight />
-            <span>Prepare</span>
+            <span>Orders</span>
             <ArrowRight />
-            <span>Deliver</span>
+            <span>Delivery</span>
           </div>
         </div>
-        <small>VarelysPerfumes admin workspace</small>
+        <small>Varelys Perfumes admin workspace</small>
       </section>
       <section className="login-form">
         <div>
-          <span className="badge violet">YOUR WORKSPACE</span>
+          <span className="badge violet">ADMIN WORKSPACE</span>
           <h2>Welcome back.</h2>
           <p>Sign in with your business account.</p>
           <form

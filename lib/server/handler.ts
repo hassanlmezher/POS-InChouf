@@ -1,5 +1,6 @@
 import {
   z,
+  InvalidJsonBodyError,
   body,
   loginInput,
   tenantInput,
@@ -37,7 +38,7 @@ import {
   validHost,
 } from './security';
 import { auth } from './supabase';
-import { ensureVarelysStore } from './varelys';
+import { ensureVarelysStore, varelysStorefrontFallback } from './varelys';
 import { placeOrder, orderDetail, updateOrder } from './orders';
 import { exportCSV } from '../csv';
 import {
@@ -247,7 +248,8 @@ export async function handle(req: Request, env: Runtime): Promise<Response> {
         },
         400,
       );
-    if (e instanceof SyntaxError) return json({ error: 'Invalid JSON.' }, 400);
+    if (e instanceof InvalidJsonBodyError)
+      return json({ error: 'Invalid JSON.' }, 400);
     const message = e instanceof Error ? e.message : '';
     if (new URL(req.url).hostname === 'localhost') console.error(e);
     if (/INSUFFICIENT_STOCK|stock_nonnegative/.test(message))
@@ -297,10 +299,40 @@ export async function handle(req: Request, env: Runtime): Promise<Response> {
   }
 }
 async function route(req: Request, env: Runtime): Promise<Response> {
-  const db = database(env);
   const url = new URL(req.url);
   const p = url.pathname.split('/').filter(Boolean).slice(1);
   const method = req.method;
+  if (p[0] === 'store' && p[1] === publicStoreSlug && p.length === 2 && method === 'GET') {
+    try {
+      const db = database(env);
+      await ensureVarelysStore(db);
+      const tenant = await publicTenant(req, env, p[1] || '');
+      return json({
+        tenant: {
+          name: tenant.name,
+          slug: tenant.slug,
+          settings: publicTenantSettings(tenant),
+        },
+        products: await rows(
+          db,
+          'SELECT id,name,description,category,sku,price,stock,lowStock,image,variants,customFields,active FROM products WHERE tenantId=? AND active=1 ORDER BY name',
+          tenant.id,
+        ),
+        zones: await rows(
+          db,
+          'SELECT id,name,fee,freeAbove,minimum,notes,active FROM zones WHERE tenantId=? AND active=1',
+          tenant.id,
+        ),
+      });
+    } catch (e) {
+      console.error(
+        'Using Varelys storefront fallback',
+        e instanceof Error ? e.name : 'Error',
+      );
+      return json(varelysStorefrontFallback());
+    }
+  }
+  const db = database(env);
   if (p[0] === 'health' && method === 'GET') {
     await one(db, 'SELECT 1');
     return json({ status: 'ok', database: 'connected' });

@@ -53,7 +53,14 @@ export async function api<T>(
         ? { body: multipart ? data : JSON.stringify(data) }
         : {}),
     });
-    const value = (await res.json()) as T & { error?: string };
+    const text = await res.text();
+    let value: (T & { error?: string }) | null = null;
+    try {
+      value = text ? (JSON.parse(text) as T & { error?: string }) : null;
+    } catch {
+      throw new Error('Server returned an unreadable response.');
+    }
+    if (!value) throw new Error('Server returned an empty response.');
     if (!res.ok) throw new Error(value.error || 'Request failed.');
     return value as T;
   } finally {

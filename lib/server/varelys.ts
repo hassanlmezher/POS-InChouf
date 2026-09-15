@@ -1,6 +1,12 @@
 import { type Database, now, one, stmt } from './db';
 import { publicStoreSlug } from './security';
-import { settingsOf, type Settings, type Tenant } from '../types';
+import {
+  settingsOf,
+  type Product,
+  type Settings,
+  type Tenant,
+  type Zone,
+} from '../types';
 
 const tenantId = 'tenant_varelysperfumes';
 
@@ -136,6 +142,63 @@ const products = [
     ],
   ],
 ] as const;
+
+export function varelysStorefrontFallback(): {
+  tenant: Tenant;
+  products: Product[];
+  zones: Zone[];
+} {
+  const createdAt = now();
+  const tenant: Tenant = {
+    id: tenantId,
+    name: 'Varelys Perfumes',
+    slug: publicStoreSlug,
+    active: 1,
+    plan: 'Varelys',
+    price: 0,
+    subscription: 'active',
+    trialStart: null,
+    trialEnd: null,
+    renewalDate: null,
+    suspendedDate: null,
+    settings: JSON.stringify(settings()),
+    createdAt,
+  };
+  return {
+    tenant: {
+      ...tenant,
+      settings: JSON.stringify(settings(tenant)),
+    },
+    products: products.map((product) => ({
+      id: product[0],
+      tenantId,
+      name: product[1],
+      description: product[2],
+      category: product[3],
+      sku: product[4],
+      price: product[5],
+      stock: product[6],
+      lowStock: 4,
+      active: 1,
+      image: product[7],
+      variants: JSON.stringify(product[8]),
+      customFields: '[]',
+      createdAt,
+    })),
+    zones: [
+      {
+        id: 'zone_lebanon',
+        tenantId,
+        name: 'Lebanon',
+        fee: 300,
+        freeAbove: 7500,
+        minimum: 0,
+        active: 1,
+        notes: 'Fast delivery across Lebanon. Pay cash on delivery.',
+      },
+    ],
+  };
+}
 
 export async function ensureVarelysStore(db: Database) {
   const existing = await one<Tenant>(
