@@ -3,6 +3,9 @@ import { loadEnvFile } from 'node:process';
 import postgres from 'postgres';
 
 try {
+  loadEnvFile('.env');
+} catch {}
+try {
   loadEnvFile('.dev.vars');
 } catch {}
 
@@ -38,6 +41,22 @@ try {
       for (const statement of statements) await tx.unsafe(statement);
       await tx`INSERT INTO drizzle.schema_migrations (filename) VALUES (${file})`;
     });
+  }
+} catch (error) {
+  if (error?.code === 'ENOTFOUND') {
+    console.error(
+      [
+        `Could not resolve database host: ${error.hostname}`,
+        '',
+        'Update SUPABASE_DATABASE_URL with the Supabase PostgreSQL pooler connection string.',
+        'In Supabase: Project Settings -> Database -> Connection string -> Transaction pooler.',
+        'It should look like:',
+        'postgresql://postgres.PROJECT_REF:DB_PASSWORD@aws-0-REGION.pooler.supabase.com:6543/postgres',
+      ].join('\n'),
+    );
+    process.exitCode = 1;
+  } else {
+    throw error;
   }
 } finally {
   await sql.end();
