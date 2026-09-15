@@ -228,7 +228,7 @@ export async function handle(req: Request, env: Runtime): Promise<Response> {
     if (
       !validHost(
         new URL(req.url).host,
-        env.SITE_HOST || 'inchouf-orderpilot.copper-goat-7392.chatgpt.site',
+        env.SITE_HOST || 'inchouf.com',
       )
     )
       fail(400, 'Unrecognized hostname.');

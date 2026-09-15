@@ -35,26 +35,27 @@ export const reserved = [
   'assets',
 ];
 export const temporaryWorkerHost = 'pos-inchouf.hassanmezher084.workers.dev';
+export const publicStoreSlug = 'varelysperfumes';
+export const publicStoreHost = `${publicStoreSlug}.inchouf.com`;
+export const adminHost = 'admin.inchouf.com';
+
 export function hostTenant(host: string) {
   const hostname = host.toLowerCase().split(':')[0];
-  if (hostname.endsWith('.inchouf.com')) {
-    const slug = hostname.slice(0, -12);
-    if (!reserved.includes(slug)) {
-      if (!/^[a-z][a-z0-9-]{1,48}[a-z0-9]$/.test(slug))
-        fail(400, 'Invalid store hostname.');
-      return slug;
-    }
-  }
+  if (hostname === publicStoreHost) return publicStoreSlug;
   return null;
 }
+
 export function validHost(host: string, siteHost?: string) {
   const h = host.toLowerCase().split(':')[0];
+  const configuredHost = siteHost?.toLowerCase().split(':')[0];
   return (
     h === 'localhost' ||
     h === '127.0.0.1' ||
     h === 'inchouf.com' ||
-    h.endsWith('.inchouf.com') ||
-    h === siteHost ||
+    h === 'www.inchouf.com' ||
+    h === adminHost ||
+    h === publicStoreHost ||
+    h === configuredHost ||
     h === temporaryWorkerHost
   );
 }

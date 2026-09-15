@@ -3,9 +3,8 @@ import './globals.css';
 import { WorkingIndicator } from '@/components/shared';
 
 export const metadata: Metadata = {
-  title: 'InChouf OrderPilot — From order to doorstep',
-  description:
-    'Independent commerce, order preparation and merchant-managed delivery for your business.',
+  title: 'VarelysPerfumes',
+  description: 'VarelysPerfumes customer site and admin workspace.',
 };
 
 export const viewport: Viewport = {

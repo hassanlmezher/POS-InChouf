@@ -534,7 +534,7 @@ void test('tenant isolation covers catalog, orders, storefronts and settings', a
         'https://other-fixture.inchouf.com',
       )
     ).status,
-    403,
+    400,
   );
   assert.equal(
     (await h.get<{ stock: number }>(
@@ -1509,11 +1509,14 @@ void test('order proof and reference upload endpoints are removed', async () => 
 });
 
 void test('security helpers and CSV export retain their non-database guarantees', () => {
-  assert.equal(hostTenant('internal-demo.inchouf.com'), 'internal-demo');
+  assert.equal(hostTenant('varelysperfumes.inchouf.com'), 'varelysperfumes');
+  assert.equal(hostTenant('internal-demo.inchouf.com'), null);
   assert.equal(hostTenant('app.inchouf.com'), null);
   assert.equal(validHost(temporaryWorkerHost, 'inchouf.com'), true);
   assert.equal(validHost('untrusted.workers.dev', 'inchouf.com'), false);
-  assert.equal(validHost('business.inchouf.com', 'inchouf.com'), true);
+  assert.equal(validHost('admin.inchouf.com', 'inchouf.com'), true);
+  assert.equal(validHost('varelysperfumes.inchouf.com', 'inchouf.com'), true);
+  assert.equal(validHost('business.inchouf.com', 'inchouf.com'), false);
   assert.deepEqual(parseCSV('a,b\n"hello, world","a""b"'), [
     ['a', 'b'],
     ['hello, world', 'a"b'],

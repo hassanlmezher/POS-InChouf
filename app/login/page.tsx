@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { ArrowLeft, ShieldCheck, ArrowRight } from 'lucide-react';
+import { ShieldCheck, ArrowRight } from 'lucide-react';
 import { Brand, Field, ErrorBox, Submit } from '@/components/shared';
 import { api, message } from '@/lib/client';
 export default function Login() {
@@ -35,12 +35,9 @@ export default function Login() {
             <span>Deliver</span>
           </div>
         </div>
-        <small>InChouf OrderPilot · Your business, in order.</small>
+        <small>VarelysPerfumes admin workspace</small>
       </section>
       <section className="login-form">
-        <a href="/" className="back-link">
-          <ArrowLeft size={16} /> Back to InChouf
-        </a>
         <div>
           <span className="badge violet">YOUR WORKSPACE</span>
           <h2>Welcome back.</h2>
@@ -92,12 +89,9 @@ export default function Login() {
             <span>
               Need access? Your business owner can help.
               <br />
-              Owners can contact InChouf for an access reset.
+              Owners can reset access from the admin workspace.
             </span>
           </div>
-          <a className="text-link" href="/store/internal-demo">
-            Explore the internal demo storefront ↗
-          </a>
         </div>
       </section>
     </main>

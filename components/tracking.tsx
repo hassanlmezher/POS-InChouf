@@ -146,7 +146,7 @@ export default function Tracking({
         progress.
       </p>
       <footer className="store-footer">
-        <a href="/">Powered by InChouf OrderPilot</a>
+        <a href="/">VarelysPerfumes</a>
       </footer>
     </main>
   );

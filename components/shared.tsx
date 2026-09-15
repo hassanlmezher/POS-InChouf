@@ -26,8 +26,8 @@ import {
 export function Brand() {
   return (
     <a className="brand" href="/">
-      <span className="brand-mark">i</span>InChouf
-      <span className="brand-product">OrderPilot</span>
+      <span className="brand-mark">V</span>VarelysPerfumes
+      <span className="brand-product">Admin</span>
     </a>
   );
 }

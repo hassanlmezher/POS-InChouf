@@ -1,8 +1,9 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { hostTenant, validHost } from './lib/server/security';
+import { adminHost, hostTenant, validHost } from './lib/server/security';
 export function middleware(req: NextRequest) {
   const host = req.nextUrl.host;
-  if (!validHost(host, 'inchouf-orderpilot.copper-goat-7392.chatgpt.site'))
+  const hostname = host.toLowerCase().split(':')[0];
+  if (!validHost(host, 'inchouf.com'))
     return new NextResponse('Unknown host', { status: 400 });
   const slug = hostTenant(host);
   const url = req.nextUrl.clone();
@@ -23,12 +24,8 @@ export function middleware(req: NextRequest) {
         return NextResponse.rewrite(url);
       }
     } else if (url.pathname === '/') {
-      if (host.startsWith('app.')) {
+      if (hostname === adminHost) {
         url.pathname = '/pos';
-        return NextResponse.rewrite(url);
-      }
-      if (host.startsWith('admin.')) {
-        url.pathname = '/admin';
         return NextResponse.rewrite(url);
       }
     }
