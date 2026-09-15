@@ -7,7 +7,6 @@ import {
   Search,
   ShieldCheck,
   ShoppingBag,
-  Star,
   Truck,
 } from 'lucide-react';
 import { EmptyState, ProductImage } from './shared';
@@ -306,12 +305,6 @@ export function StorefrontProductCard({
         </button>
       </h3>
       <strong className="store-product-price">{money(product.price)}</strong>
-      <div className="store-product-rating" aria-label="Rated 5 out of 5">
-        {Array.from({ length: 5 }).map((_, index) => (
-          <Star key={index} size={12} fill="currentColor" />
-        ))}
-        <span>(124)</span>
-      </div>
       <button
         className="add-to-bag-btn"
         onClick={() => commerce.setSelected(product)}

@@ -545,45 +545,73 @@ void test('tenant isolation covers catalog, orders, storefronts and settings', a
   );
 });
 
-void test('Varelys public storefront self-heals old tenant availability state', async () => {
+void test('Varelys public storefront reads its catalog from the database', async () => {
   const h = await harness();
-  const host = 'https://varelysperfumes.inchouf.com';
-  const response = await h.request('store/varelysperfumes', 'GET', undefined, '', host);
-  const text = await response.text();
-  assert.equal(response.status, 200, text);
-  const data = JSON.parse(text) as {
-    tenant: { name: string; slug: string; settings: string };
-    products: unknown[];
-    zones: unknown[];
+  const date = new Date().toISOString();
+  const settings = {
+    tagline: 'Varelys Perfumes',
+    description: 'A database-backed fragrance collection.',
+    contactEmail: 'varelysperfumes@gmail.com',
+    paymentOptions: ['Cash on delivery'],
+    currency: 'USD',
+    storefront: {
+      template: 'varelys-perfumes',
+      theme: {},
+      sections: [],
+    },
   };
-  const settings = JSON.parse(data.tenant.settings) as {
-    paymentOptions: string[];
-    storefront: { template: string };
-  };
-  assert.equal(data.tenant.slug, 'varelysperfumes');
-  assert.equal(settings.storefront.template, 'varelys-perfumes');
-  assert.deepEqual(settings.paymentOptions, ['Cash on delivery']);
-  assert.ok(data.products.length > 0);
-  assert.ok(data.zones.length > 0);
-
   await h.run(
-    "UPDATE tenants SET active=0, subscription='suspended' WHERE slug=?",
+    'INSERT INTO tenants (id,name,slug,active,subscription,settings,createdAt) VALUES (?,?,?,?,?,?,?)',
+    'tenant_varelysperfumes',
+    'Varelys Perfumes',
     'varelysperfumes',
+    1,
+    'active',
+    JSON.stringify(settings),
+    date,
   );
-  const repaired = await h.request(
+  await h.run(
+    'INSERT INTO products (id,tenantId,name,description,category,sku,price,stock,active,image,createdAt) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+    'varelys-product',
+    'tenant_varelysperfumes',
+    'Database Scent',
+    'Loaded from the catalog.',
+    'Women',
+    'DB-001',
+    2500,
+    4,
+    1,
+    'database-scent.jpg',
+    date,
+  );
+  await h.run(
+    'INSERT INTO zones (id,tenantId,name,fee) VALUES (?,?,?,?)',
+    'varelys-zone',
+    'tenant_varelysperfumes',
+    'Lebanon',
+    300,
+  );
+
+  const response = await h.request(
     'store/varelysperfumes',
     'GET',
     undefined,
     '',
-    host,
+    'https://varelysperfumes.inchouf.com',
   );
-  assert.equal(repaired.status, 200, await repaired.text());
-  const tenant = await h.get<{ active: number; subscription: string }>(
-    'SELECT active,subscription FROM tenants WHERE slug=?',
-    'varelysperfumes',
-  );
-  assert.equal(tenant?.active, 1);
-  assert.equal(tenant?.subscription, 'active');
+  const responseText = await response.text();
+  assert.equal(response.status, 200, responseText);
+  const data = JSON.parse(responseText) as {
+    tenant: { slug: string; settings: string };
+    products: { image: string }[];
+    zones: { name: string }[];
+  };
+  const loadedSettings = JSON.parse(data.tenant.settings) as typeof settings;
+  assert.equal(data.tenant.slug, 'varelysperfumes');
+  assert.equal(loadedSettings.storefront.template, 'varelys-perfumes');
+  assert.deepEqual(loadedSettings.paymentOptions, ['Cash on delivery']);
+  assert.deepEqual(data.products.map((product) => product.image), ['database-scent.jpg']);
+  assert.deepEqual(data.zones.map((zone) => zone.name), ['Lebanon']);
 });
 
 void test('PostgreSQL composite foreign keys reject cross-tenant relationships', async () => {
