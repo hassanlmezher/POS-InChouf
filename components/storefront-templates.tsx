@@ -16,7 +16,6 @@ import {
   Grid3X3,
   Heart,
   Home,
-  Menu,
   Search,
   Shield,
   ShieldCheck,
@@ -179,84 +178,32 @@ function VarelysPerfumesStorefront({
     defaultStorefrontConfig.sections[0];
   const shownProducts = commerce.filteredProducts;
   const bestSellers = shownProducts.slice(0, 5);
-  const heroProduct = commerce.products[0];
 
   return (
     <div className={className} style={style}>
       <header className="vp-nav">
-        <button className="vp-mobile-icon" type="button" aria-label="Open menu">
-          <Menu size={20} />
-        </button>
         <a href={`/store/${commerce.slug}`} className="vp-brand">
           <img src={view.logo} alt="Varelys Perfumes logo" />
         </a>
-        <nav className="vp-nav-links" aria-label="Storefront sections">
-          {['Home', 'Men', 'Women', 'Best Sellers', 'New In', 'Offers'].map(
-            (item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => {
-                  if (item === 'Home') commerce.showAllProducts();
-                  else {
-                    commerce.setCategory(item);
-                    document
-                      .getElementById('products')
-                      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  }
-                }}
-              >
-                {item}
-              </button>
-            ),
-          )}
-        </nav>
-        <div className="vp-actions">
-          <button
-            type="button"
-            aria-label="Search products"
-            onClick={commerce.focusCollectionSearch}
-          >
-            <Search size={20} />
-          </button>
-          <a href="/login" aria-label="Account">
-            <User size={20} />
-          </a>
-          <button
-            type="button"
-            aria-label={`Open cart, ${commerce.count} items`}
-            onClick={() => commerce.setCartOpen(true)}
-          >
-            <ShoppingBag size={20} />
-            {commerce.count > 0 && <span>{commerce.count}</span>}
-          </button>
-        </div>
+        <label className="vp-header-search">
+          <Search size={18} aria-hidden="true" />
+          <input
+            ref={commerce.searchInputRef}
+            aria-label="Search perfumes"
+            placeholder="Search perfumes"
+            value={commerce.search}
+            onChange={(event) => commerce.setSearch(event.target.value)}
+          />
+        </label>
       </header>
 
       <main>
-        <section className="vp-hero" id={hero.id}>
-          <div className="vp-hero-copy">
-            <VarelysHeroTitle title={hero.title} />
-            <p>
-              {hero.description ||
-                commerce.settings.description ||
-                'Iconic scents. Unforgettable moments.'}
-            </p>
-            <button
-              className="vp-button"
-              type="button"
-              onClick={commerce.showAllProducts}
-            >
-              Shop Now <span>{'->'}</span>
-            </button>
-          </div>
-          <div className="vp-hero-media">
-            {heroProduct ? (
-              <img src={heroProduct.image} alt={heroProduct.name} />
-            ) : (
-              <img src={view.logo} alt="Varelys Perfumes" />
-            )}
-          </div>
+        <section className="vp-hero" id={hero.id} aria-label="Varelys Perfumes">
+          <img
+            className="vp-hero-image"
+            src="/brand/varelys-hero.png"
+            alt="Varelys Perfumes fragrance collection"
+          />
         </section>
 
         <section className="vp-promises" aria-label="Store promises">
@@ -291,17 +238,6 @@ function VarelysPerfumesStorefront({
               {'View All ->'}
             </button>
           </div>
-
-          <label className="vp-search">
-            <Search size={18} />
-            <input
-              ref={commerce.searchInputRef}
-              aria-label="Search perfumes"
-              placeholder="Search perfumes"
-              value={commerce.search}
-              onChange={(e) => commerce.setSearch(e.target.value)}
-            />
-          </label>
 
           <div className="vp-category-row">
             {commerce.categories.map((category) => (
@@ -405,22 +341,6 @@ function VarelysPerfumesStorefront({
 
       <StorefrontCommerceChrome commerce={commerce} />
     </div>
-  );
-}
-
-function VarelysHeroTitle({ title }: { title?: string }) {
-  const defaultTitle = 'More Than A Fragrance A Feeling';
-  const text = title || defaultTitle;
-  if (text.trim().toLowerCase() !== defaultTitle.toLowerCase())
-    return <h1>{text}</h1>;
-  return (
-    <h1>
-      More Than
-      <br />
-      A Fragrance
-      <br />
-      <em>A Feeling</em>
-    </h1>
   );
 }
 

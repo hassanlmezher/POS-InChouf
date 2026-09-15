@@ -3586,6 +3586,43 @@ input.search-input {
   background: var(--vp-surface);
   color: var(--vp-ink);
 }
+
+.storefront-template-varelys-perfumes .vp-nav {
+  position: static;
+  top: auto;
+  z-index: auto;
+  grid-template-columns: auto minmax(220px, 520px);
+  justify-content: space-between;
+  min-height: 78px;
+  background: #c9c0b5;
+  backdrop-filter: none;
+}
+
+.storefront-template-varelys-perfumes .vp-header-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid rgba(14, 13, 11, 0.2);
+  border-radius: 2px;
+  background: rgba(255, 253, 248, 0.82);
+  color: var(--vp-ink);
+}
+
+.storefront-template-varelys-perfumes .vp-header-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--vp-ink);
+  font: 500 14px/1 Georgia, 'Times New Roman', serif;
+}
+
+.storefront-template-varelys-perfumes .vp-header-search input::placeholder {
+  color: rgba(14, 13, 11, 0.6);
+}
 .vp-promises span {
   max-width: 128px;
   font-size: 13px;
@@ -4319,38 +4356,19 @@ input.search-input {
 }
 
 .vp-hero {
-  min-height: clamp(430px, 48vw, 590px);
-  background:
-    linear-gradient(100deg, rgba(255, 252, 246, 0.94) 0%, rgba(248, 240, 228, 0.82) 47%, rgba(116, 90, 61, 0.16) 100%),
-    radial-gradient(circle at 78% 34%, #f5ecdf 0%, #ccb69b 35%, #74614e 70%, #3d3329 100%);
+  display: block;
+  min-height: 0;
+  background: #e4d6c5;
 }
 
-.vp-hero-copy {
-  padding-left: clamp(38px, 6.8vw, 92px);
-}
-
-.vp-hero h1 {
-  max-width: 580px;
-  font-size: clamp(50px, 6.2vw, 88px);
-}
-
-.vp-hero-media {
-  min-height: clamp(430px, 48vw, 590px);
-  padding-right: clamp(32px, 5vw, 74px);
-}
-
-.vp-hero-media::before {
-  inset: 4% 0 0 14%;
-  background:
-    linear-gradient(110deg, rgba(255, 255, 255, 0.38), transparent 38%),
-    radial-gradient(circle at 68% 30%, rgba(255, 255, 255, 0.68), transparent 29%),
-    linear-gradient(145deg, rgba(80, 65, 48, 0.16), rgba(227, 211, 189, 0.22));
-  border-radius: 44% 56% 0 0;
-}
-
-.vp-hero-media img {
-  max-width: min(480px, 92%);
-  max-height: 470px;
+.vp-hero-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: none;
+  aspect-ratio: 8 / 3;
+  object-fit: cover;
+  object-position: center;
 }
 
 .vp-promises,
@@ -4469,6 +4487,18 @@ input.search-input {
 .vp-split > * {
   position: relative;
   z-index: 1;
+}
+
+.storefront-template-varelys-perfumes .vp-her {
+  background:
+    linear-gradient(90deg, rgba(52, 31, 16, 0.5), rgba(52, 31, 16, 0.06)),
+    url('/brand/varelys-for-her.png') center / cover no-repeat;
+}
+
+.storefront-template-varelys-perfumes .vp-him {
+  background:
+    linear-gradient(90deg, rgba(8, 9, 11, 0.62), rgba(8, 9, 11, 0.12)),
+    url('/brand/varelys-for-him.png') center / cover no-repeat;
 }
 
 .vp-footer-promises {
@@ -4815,38 +4845,24 @@ input.search-input {
     background: var(--vp-surface);
   }
 
-  .vp-nav {
-    grid-template-columns: 36px minmax(0, 1fr) 84px;
-    min-height: 70px;
+  .storefront-template-varelys-perfumes .vp-nav {
+    grid-template-columns: 92px minmax(0, 1fr);
+    min-height: 66px;
     padding: 0 14px;
   }
 
   .vp-brand {
-    width: 104px;
+    width: 92px;
   }
 
-  .vp-actions {
-    gap: 8px;
+  .storefront-template-varelys-perfumes .vp-header-search {
+    min-height: 38px;
+    padding: 0 10px;
   }
 
-  .vp-hero-copy {
-    padding: 36px 20px 18px;
-  }
-
-  .vp-hero h1 {
-    max-width: 280px;
-    font-size: 38px;
-  }
-
-  .vp-hero-media {
-    min-height: 212px;
-    margin-top: -118px;
-    padding-right: 20px;
-  }
-
-  .vp-hero-media img {
-    max-width: 152px;
-    max-height: 200px;
+  .vp-hero-image {
+    aspect-ratio: 1.35 / 1;
+    object-position: center;
   }
 
   .vp-products {
@@ -4930,4 +4946,82 @@ input.search-input {
   .order-complete-actions {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* Keep order tracking in the same Varelys customer-facing system. */
+.tracking-page {
+  --sf-accent: #11100e;
+  --sf-text: #11100e;
+  --sf-text-muted: #6f675d;
+  --sf-text-dim: #9b9185;
+  --sf-border: #e6d9c9;
+  max-width: none;
+  min-height: 100vh;
+  padding: 30px clamp(18px, 4vw, 64px) 52px;
+  background: #f8f2e8;
+  color: var(--sf-text);
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+.tracking-page > * {
+  max-width: 780px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.tracking-page .back-link {
+  color: var(--sf-text);
+}
+
+.tracking-page .tracking-hero {
+  padding: 54px 0 40px;
+}
+
+.tracking-page .tracking-hero h1 {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 500;
+}
+
+.tracking-page .tracking-icon {
+  background: #fffaf3;
+  color: var(--sf-accent);
+  border-color: var(--sf-border);
+}
+
+.tracking-page .tracking-steps {
+  border-color: var(--sf-border);
+}
+
+.tracking-page .tracking-steps span {
+  background: #eee7dd;
+  border-color: var(--sf-border);
+}
+
+.tracking-page .tracking-steps .complete span,
+.tracking-page .tracking-steps .current span {
+  background: var(--sf-text);
+  border-color: var(--sf-text);
+  box-shadow: none;
+}
+
+.tracking-page .tracking-steps .complete p,
+.tracking-page .tracking-steps .current p {
+  color: var(--sf-text);
+}
+
+.tracking-page .panel {
+  border-color: var(--sf-border);
+  border-radius: 4px;
+  background: #fffaf3;
+  box-shadow: 0 18px 42px rgba(34, 25, 15, 0.07);
+}
+
+.tracking-page .panel-head,
+.tracking-page .order-total {
+  border-color: var(--sf-border);
+}
+
+.tracking-page .private-note,
+.tracking-page .store-footer {
+  color: var(--sf-text-muted);
 }
