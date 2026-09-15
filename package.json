@@ -17,6 +17,7 @@
     "test:e2e": "playwright test",
     "db:migrate": "node scripts/migrate.mjs",
     "db:seed": "node scripts/seed.mjs",
+    "varelys:setup": "node scripts/setup-varelys.mjs",
     "demo:setup": "node scripts/setup-demo.mjs"
   },
   "dependencies": {

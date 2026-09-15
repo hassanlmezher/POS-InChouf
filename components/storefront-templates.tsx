@@ -12,7 +12,18 @@ import {
   StorefrontCommerceChrome,
   useStorefrontCommerce,
 } from './storefront-commerce';
-import { Search, ShoppingBag } from 'lucide-react';
+import {
+  Grid3X3,
+  Heart,
+  Home,
+  Menu,
+  Search,
+  ShieldCheck,
+  ShoppingBag,
+  SlidersHorizontal,
+  Truck,
+  User,
+} from 'lucide-react';
 import {
   StorefrontCategories,
   StorefrontNav,
@@ -48,7 +59,12 @@ export function StorefrontTemplate({
   const view: StorefrontViewModel = {
     tenant,
     displayName: slug === 'internal-demo' ? 'The Demo Collection' : tenant.name,
-    logo: settings.branding?.logoId ? `/api/store/${slug}/logo` : '',
+    logo:
+      slug === 'varelysperfumes'
+        ? '/brand/varelys-perfumes-logo.png'
+        : settings.branding?.logoId
+          ? `/api/store/${slug}/logo`
+          : '',
     commerce,
   };
   const sections = normalizedSections(settings.storefront.sections);
@@ -111,6 +127,16 @@ export function StorefrontTemplate({
       />
     );
 
+  if (template === 'varelys-perfumes')
+    return (
+      <VarelysPerfumesStorefront
+        view={view}
+        sections={sections}
+        className={className}
+        style={themeStyle(settings.storefront.theme)}
+      />
+    );
+
   if (template === 'custom')
     return (
       <div className={className} style={themeStyle(settings.storefront.theme)}>
@@ -130,6 +156,238 @@ export function StorefrontTemplate({
       <main>
         <StorefrontSections view={view} sections={sections} />
       </main>
+      <StorefrontCommerceChrome commerce={commerce} />
+    </div>
+  );
+}
+
+function VarelysPerfumesStorefront({
+  view,
+  sections,
+  className,
+  style,
+}: {
+  view: StorefrontViewModel;
+  sections: StorefrontSection[];
+  className: string;
+  style: CSSProperties;
+}) {
+  const { commerce } = view;
+  const hero =
+    sections.find((item) => item.type === 'hero' && item.enabled !== false) ||
+    defaultStorefrontConfig.sections[0];
+  const shownProducts = commerce.filteredProducts;
+  const bestSellers = shownProducts.slice(0, 5);
+  const heroProduct = commerce.products[0];
+
+  return (
+    <div className={className} style={style}>
+      <header className="vp-nav">
+        <button className="vp-mobile-icon" type="button" aria-label="Open menu">
+          <Menu size={20} />
+        </button>
+        <a href={`/store/${commerce.slug}`} className="vp-brand">
+          <img src={view.logo} alt="Varelys Perfumes logo" />
+        </a>
+        <nav className="vp-nav-links" aria-label="Storefront sections">
+          {['Home', 'Men', 'Women', 'Best Sellers', 'New In', 'Offers'].map(
+            (item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => {
+                  if (item === 'Home') commerce.showAllProducts();
+                  else {
+                    commerce.setCategory(item);
+                    document
+                      .getElementById('products')
+                      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }
+                }}
+              >
+                {item}
+              </button>
+            ),
+          )}
+        </nav>
+        <div className="vp-actions">
+          <button
+            type="button"
+            aria-label="Search products"
+            onClick={commerce.focusCollectionSearch}
+          >
+            <Search size={20} />
+          </button>
+          <a href="/login" aria-label="Account">
+            <User size={20} />
+          </a>
+          <button
+            type="button"
+            aria-label={`Open cart, ${commerce.count} items`}
+            onClick={() => commerce.setCartOpen(true)}
+          >
+            <ShoppingBag size={20} />
+            {commerce.count > 0 && <span>{commerce.count}</span>}
+          </button>
+        </div>
+      </header>
+
+      <main>
+        <section className="vp-hero" id={hero.id}>
+          <div className="vp-hero-copy">
+            <h1>{hero.title || 'More Than A Fragrance A Feeling'}</h1>
+            <p>
+              {hero.description ||
+                commerce.settings.description ||
+                'Iconic scents. Unforgettable moments.'}
+            </p>
+            <button
+              className="vp-button"
+              type="button"
+              onClick={commerce.showAllProducts}
+            >
+              Shop Now <span>{'->'}</span>
+            </button>
+          </div>
+          <div className="vp-hero-media">
+            {heroProduct ? (
+              <img src={heroProduct.image} alt={heroProduct.name} />
+            ) : (
+              <img src={view.logo} alt="Varelys Perfumes" />
+            )}
+          </div>
+        </section>
+
+        <section className="vp-promises" aria-label="Store promises">
+          {[
+            [ShieldCheck, 'Authentic Quality'],
+            [Truck, 'Fast Delivery Across Lebanon'],
+            [ShoppingBag, 'Cash on Delivery'],
+            [User, 'Customer Support'],
+          ].map(([Icon, label]) => (
+            <div key={String(label)}>
+              <Icon size={24} />
+              <span>{String(label)}</span>
+            </div>
+          ))}
+        </section>
+
+        <section className="vp-products" id="products">
+          <div className="vp-section-head">
+            <div>
+              <h2>
+                {commerce.category === 'All products'
+                  ? 'Best Sellers'
+                  : commerce.category}
+              </h2>
+              <p>
+                {commerce.category === 'All products'
+                  ? 'Our most loved fragrances, chosen by you.'
+                  : `${shownProducts.length} products`}
+              </p>
+            </div>
+            <button type="button" onClick={commerce.showAllProducts}>
+              {'View All ->'}
+            </button>
+          </div>
+
+          <label className="vp-search">
+            <Search size={18} />
+            <input
+              ref={commerce.searchInputRef}
+              aria-label="Search perfumes"
+              placeholder="Search perfumes"
+              value={commerce.search}
+              onChange={(e) => commerce.setSearch(e.target.value)}
+            />
+          </label>
+
+          <div className="vp-category-row">
+            {commerce.categories.map((category) => (
+              <button
+                className={commerce.category === category ? 'active' : ''}
+                key={category}
+                type="button"
+                onClick={() => commerce.setCategory(category)}
+              >
+                {category === 'All products' ? 'All' : category}
+              </button>
+            ))}
+            <button type="button" className="vp-sort">
+              <SlidersHorizontal size={15} /> Sort
+            </button>
+          </div>
+
+          {shownProducts.length ? (
+            <div className="vp-product-grid">
+              {(commerce.category === 'All products' && !commerce.search
+                ? bestSellers
+                : shownProducts
+              ).map((product) => (
+                <StorefrontProductCard
+                  key={product.id}
+                  product={product}
+                  commerce={commerce}
+                />
+              ))}
+            </div>
+          ) : (
+            <StorefrontProductGrid
+              view={view}
+              section={{
+                id: 'products-empty',
+                type: 'featuredProducts',
+                title: 'No products match',
+              }}
+            />
+          )}
+        </section>
+
+        <section className="vp-split-banners">
+          <button
+            className="vp-split vp-her"
+            type="button"
+            onClick={() => commerce.setCategory('Women')}
+          >
+            <span>For Her</span>
+            <small>Elegant. Bold. Unforgettable.</small>
+            <strong>{'Shop Women ->'}</strong>
+          </button>
+          <button
+            className="vp-split vp-him"
+            type="button"
+            onClick={() => commerce.setCategory('Men')}
+          >
+            <span>For Him</span>
+            <small>Confident. Modern. Iconic.</small>
+            <strong>{'Shop Men ->'}</strong>
+          </button>
+        </section>
+      </main>
+
+      <nav className="vp-bottom-nav" aria-label="Mobile navigation">
+        {[
+          [Home, 'Home'],
+          [ShoppingBag, 'Shop'],
+          [Grid3X3, 'Categories'],
+          [Heart, 'Favorites'],
+          [User, 'Account'],
+        ].map(([Icon, label]) => (
+          <button
+            key={String(label)}
+            type="button"
+            onClick={() => {
+              if (label === 'Shop' || label === 'Categories')
+                commerce.showAllProducts();
+              if (label === 'Account') location.href = '/login';
+            }}
+          >
+            <Icon size={19} />
+            <span>{String(label)}</span>
+          </button>
+        ))}
+      </nav>
+
       <StorefrontCommerceChrome commerce={commerce} />
     </div>
   );

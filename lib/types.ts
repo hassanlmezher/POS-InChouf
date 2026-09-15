@@ -106,6 +106,7 @@ export const storefrontTemplates = [
   'editorial',
   'compact',
   'luxury-watches',
+  'varelys-perfumes',
   'custom',
 ] as const;
 export type StorefrontTemplate = (typeof storefrontTemplates)[number];

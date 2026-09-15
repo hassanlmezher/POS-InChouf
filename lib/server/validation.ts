@@ -84,12 +84,13 @@ export const productInput = z
     active: z.boolean(),
     image: z
       .string()
-      .max(100)
+      .max(500)
       .refine(
         (x) =>
           !x ||
           /^\/assets\/[a-z0-9.-]+$/.test(x) ||
-          /^\/api\/images\/[a-f0-9-]+$/.test(x),
+          /^\/api\/images\/[a-f0-9-]+$/.test(x) ||
+          /^https:\/\/[^\s"'<>]{1,470}$/i.test(x),
       ),
     variants: z
       .array(
