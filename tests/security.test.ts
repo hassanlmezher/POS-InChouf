@@ -387,6 +387,11 @@ void test('tenant isolation covers catalog, orders, storefronts and settings', a
     ).status,
     404,
   );
+  assert.equal(
+    (await h.request('products/other-product', 'DELETE', undefined, h.cookie))
+      .status,
+    404,
+  );
   const input = await checkout(h);
   input.items[0].productId = 'other-product';
   input.items[0].variant = '';
@@ -971,6 +976,43 @@ void test('product creation generates a tenant-unique SKU on the server', async 
   assert.match(createdSecond!.sku, /^SKU-[A-F0-9]{12}$/);
   assert.notEqual(created!.sku, 'CLIENT-SUPPLIED-SKU');
   assert.notEqual(created!.sku, createdSecond!.sku);
+});
+
+void test('product deletion hard-deletes tenant-owned catalog rows', async () => {
+  const h = await setup();
+  const input = {
+    name: 'Delete me product',
+    description: 'Temporary catalog item',
+    category: 'General',
+    sku: 'DELETE-ME',
+    price: 1200,
+    stock: 4,
+    lowStock: 1,
+    active: true,
+    image: '',
+    variants: [],
+    customFields: [],
+  };
+  const created = await h.request('products', 'POST', input, h.cookie);
+  const createdText = await created.text();
+  assert.equal(created.status, 200, createdText);
+  const id = (JSON.parse(createdText) as { id: string }).id;
+
+  const deleted = await h.request(`products/${id}`, 'DELETE', undefined, h.cookie);
+  assert.equal(deleted.status, 200, await deleted.text());
+  const remaining = await h.get<{ count: number }>(
+    'SELECT COUNT(*) AS count FROM products WHERE tenantId=? AND id=?',
+    h.tenant,
+    id,
+  );
+  assert.equal(remaining!.count, 0);
+
+  const event = await h.get<{ action: string; detail: string }>(
+    'SELECT action,detail FROM events WHERE tenantId=? ORDER BY createdAt DESC LIMIT 1',
+    h.tenant,
+  );
+  assert.equal(event!.action, 'Product deleted');
+  assert.match(event!.detail, /Delete me product/);
 });
 
 void test('invalid business logos are rejected before tenant creation', async () => {

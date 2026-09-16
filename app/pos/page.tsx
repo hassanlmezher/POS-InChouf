@@ -5,6 +5,7 @@ import {
   ShoppingBag,
   ListChecks,
   Package,
+  Trash2,
   Truck,
   Users,
   Settings,
@@ -186,6 +187,7 @@ export default function Pos() {
     [selected, setSelected] = useState<string | null>(null),
     [selectedCustomer, setSelectedCustomer] = useState<string | null>(null),
     [editing, setEditing] = useState<Product | null | undefined>(undefined),
+    [deletingProduct, setDeletingProduct] = useState<string | null>(null),
     [manual, setManual] = useState(false),
     [error, setError] = useState(''),
     [loggingOut, setLoggingOut] = useState(false),
@@ -253,6 +255,25 @@ export default function Pos() {
     void orders.refresh();
     void products.refresh();
     void team.refresh();
+  };
+  const deleteProduct = async (product: Product) => {
+    const confirmed = window.confirm(
+      `Do you really want to delete ${product.name}? This cannot be undone.`,
+    );
+    if (!confirmed) return;
+    setDeletingProduct(product.id);
+    setError('');
+    try {
+      await api(`products/${product.id}`, 'DELETE');
+      await products.refresh();
+      setToast({ kind: 'success', text: `${product.name} was deleted.` });
+    } catch (e) {
+      const text = message(e);
+      setError(text);
+      setToast({ kind: 'error', text });
+    } finally {
+      setDeletingProduct(null);
+    }
   };
   if (me.loading) return <Loading />;
   if (me.error || !user || !tenant)
@@ -949,7 +970,7 @@ export default function Pos() {
                           </small>
                           <h3>{p.name}</h3>
                           <strong>{money(p.price)}</strong>
-                          <div className="section-heading">
+                          <div className="section-heading product-card-actions">
                             <span
                               className={
                                 'badge ' +
@@ -963,6 +984,23 @@ export default function Pos() {
                               onClick={() => setEditing(p)}
                             >
                               Edit ↗
+                            </button>
+                            <button
+                              className="text-link danger-link"
+                              disabled={deletingProduct === p.id}
+                              onClick={() => void deleteProduct(p)}
+                            >
+                              {deletingProduct === p.id ? (
+                                <>
+                                  <Loader2 size={14} className="animate-spin" />
+                                  Deleting
+                                </>
+                              ) : (
+                                <>
+                                  <Trash2 size={14} />
+                                  Delete
+                                </>
+                              )}
                             </button>
                           </div>
                         </div>

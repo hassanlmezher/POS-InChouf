@@ -2530,6 +2530,23 @@ input.search-input {
 .product-admin-card .section-heading {
   margin-top: 17px;
 }
+.product-card-actions {
+  align-items: center;
+  gap: 12px;
+}
+.product-card-actions .badge {
+  margin-right: auto;
+}
+.danger-link {
+  color: #ab3e48;
+}
+.danger-link:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.danger-link svg {
+  vertical-align: -2px;
+}
 .detail-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

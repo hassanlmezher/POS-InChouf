@@ -938,6 +938,38 @@ async function route(req: Request, env: Runtime): Promise<Response> {
           t,
         ),
       );
+    if (method === 'DELETE') {
+      const product = await one<{ name: string; sku: string }>(
+        db,
+        'SELECT name,sku FROM products WHERE tenantId=? AND id=?',
+        t,
+        p[1],
+      );
+      const deletedProduct = product ?? fail(404, 'Product not found.');
+      const referenced = await one<{ id: string }>(
+        db,
+        'SELECT id FROM items WHERE tenantId=? AND productId=? LIMIT 1',
+        t,
+        p[1],
+      );
+      if (referenced)
+        fail(
+          409,
+          'This product is tied to existing orders. Mark it inactive instead.',
+        );
+      await db.batch([
+        stmt(db, 'DELETE FROM products WHERE tenantId=? AND id=?', t, p[1]),
+        event(
+          db,
+          t,
+          user.name,
+          'Product deleted',
+          null,
+          `${deletedProduct.sku}: ${deletedProduct.name}`,
+        ),
+      ]);
+      return json({ ok: true });
+    }
     if (['POST', 'PATCH'].includes(method)) {
       const input = await body(req, productInput);
       if (
