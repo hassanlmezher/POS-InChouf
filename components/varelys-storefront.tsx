@@ -6,7 +6,6 @@ import {
   ChevronLeft,
   ChevronDown,
   ChevronRight,
-  Menu,
   Search,
   ShoppingBag,
   Sparkles,
@@ -108,14 +107,6 @@ export default function VarelysStorefront({
         </nav>
 
         <div className="vp3-header-actions">
-          <button
-            className="vp3-icon-button vp3-menu-button"
-            type="button"
-            aria-label="Open navigation"
-            onClick={scrollToCollection}
-          >
-            <Menu size={18} />
-          </button>
           <button
             className="vp3-icon-button"
             type="button"

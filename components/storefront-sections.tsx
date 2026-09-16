@@ -2,7 +2,6 @@
 import {
   ArrowRight,
   Heart,
-  Menu,
   Package,
   Search,
   ShieldCheck,
@@ -86,9 +85,6 @@ function StorefrontNavActions({
         <ShoppingBag size={size} />
         {commerce.count > 0 && <span className="nav-cart-badge">{commerce.count}</span>}
       </button>
-      <a className="nav-icon-btn" href="#store-info" aria-label="Open menu">
-        <Menu size={size} />
-      </a>
     </div>
   );
 }
