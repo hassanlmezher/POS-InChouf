@@ -863,15 +863,15 @@ small {
   gap: 8px;
   min-height: 40px;
   padding: 0 14px;
-  border-color: var(--vp3-ink);
+  border-color: transparent;
   border-radius: 0;
   font: 600 12px/1 Inter, ui-sans-serif, sans-serif;
 }
 
 .vp3-bag-button:hover,
 .vp3-bag-button:focus-visible {
-  background: var(--vp3-ink);
-  color: var(--vp3-paper);
+  background: var(--vp3-paper);
+  color: var(--vp3-ink);
 }
 
 .vp3-bag-icon {
