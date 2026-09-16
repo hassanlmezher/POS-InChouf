@@ -1670,7 +1670,25 @@ small {
   .vp3-hero-copy {
     order: 2;
     min-height: auto;
-    padding: 36px 20px 42px;
+    align-items: center;
+    padding: 22px 20px 34px;
+  }
+
+  .vp3-hero .vp3-kicker,
+  .vp3-hero h1,
+  .vp3-hero-copy > p,
+  .vp3-hero-note {
+    display: none;
+  }
+
+  .vp3-hero-actions {
+    justify-content: center;
+    width: 100%;
+    margin-top: 0;
+  }
+
+  .vp3-hero-actions .vp3-primary-button {
+    width: min(100%, 320px);
   }
 
   .vp3-hero h1 {
