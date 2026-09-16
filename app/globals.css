@@ -1662,12 +1662,15 @@ small {
   }
 
   .vp3-hero {
-    display: block;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
   }
 
   .vp3-hero-copy {
-    min-height: 430px;
-    padding: 58px 20px 42px;
+    order: 2;
+    min-height: auto;
+    padding: 36px 20px 42px;
   }
 
   .vp3-hero h1 {
@@ -1675,8 +1678,10 @@ small {
   }
 
   .vp3-hero-stage {
-    min-height: 440px;
-    border-top: 1px solid var(--vp3-line);
+    order: 1;
+    min-height: clamp(320px, 58vh, 500px);
+    border-top: 0;
+    border-bottom: 1px solid var(--vp3-line);
     border-left: 0;
   }
 
