@@ -3,9 +3,7 @@
 import {
   ArrowDownRight,
   ArrowRight,
-  ChevronLeft,
   ChevronDown,
-  ChevronRight,
   Search,
   ShoppingBag,
   Sparkles,
@@ -84,16 +82,6 @@ export default function VarelysStorefront({
     });
   };
 
-  const showPreviousHeroProduct = () => {
-    setActiveHeroIndex((current) =>
-      (current - 1 + heroSlides.length) % heroSlides.length,
-    );
-  };
-
-  const showNextHeroProduct = () => {
-    setActiveHeroIndex((current) => (current + 1) % heroSlides.length);
-  };
-
   return (
     <div className={`${className} vp3-store`} style={style}>
       <header className="vp3-header">
@@ -166,14 +154,7 @@ export default function VarelysStorefront({
                     alt={activeHeroSlide.alt}
                   />
                 </div>
-                <div className="vp3-carousel-controls" aria-label="Campaign image controls">
-                  <button
-                    type="button"
-                    onClick={showPreviousHeroProduct}
-                    aria-label="Show previous campaign image"
-                  >
-                    <ChevronLeft size={17} />
-                  </button>
+                <div className="vp3-carousel-controls" aria-label="Campaign image slides">
                   <div className="vp3-carousel-dots">
                     {heroSlides.map((slide, index) => (
                       <button
@@ -186,13 +167,6 @@ export default function VarelysStorefront({
                       />
                     ))}
                   </div>
-                  <button
-                    type="button"
-                    onClick={showNextHeroProduct}
-                    aria-label="Show next campaign image"
-                  >
-                    <ChevronRight size={17} />
-                  </button>
                 </div>
               </>
             ) : (
