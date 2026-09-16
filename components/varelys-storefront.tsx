@@ -10,7 +10,7 @@ import {
   ShoppingBag,
   Sparkles,
 } from 'lucide-react';
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { money, type Product, type StorefrontSection } from '@/lib/types';
 import { ProductImage, EmptyState } from './shared';
 import {
@@ -18,6 +18,21 @@ import {
   type StorefrontCommerce,
 } from './storefront-commerce';
 import type { StorefrontViewModel } from './storefront-sections';
+
+const heroSlides = [
+  {
+    src: '/brand/varelys-hero-bleu.png',
+    alt: 'Bleu de Chanel perfume bottle in warm Mediterranean light.',
+  },
+  {
+    src: '/brand/varelys-hero-allure.png',
+    alt: 'Allure Homme perfume bottle on stone with lemon and olive leaves.',
+  },
+  {
+    src: '/brand/varelys-hero-oud.png',
+    alt: 'Oud Wood perfume bottle on dark stone in golden light.',
+  },
+];
 
 export default function VarelysStorefront({
   view,
@@ -42,33 +57,25 @@ export default function VarelysStorefront({
     (section) => section.type === 'deliveryInfo' && section.enabled !== false,
   );
   const products = commerce.filteredProducts;
-  const carouselProducts = useMemo(
-    () => (commerce.products.length ? commerce.products : products),
-    [commerce.products, products],
-  );
   const [activeHeroIndex, setActiveHeroIndex] = useState(0);
-  const activeHeroProduct = carouselProducts[activeHeroIndex] || carouselProducts[0];
+  const activeHeroSlide = heroSlides[activeHeroIndex] || heroSlides[0];
   const title = hero?.title || commerce.settings.tagline || view.tenant.name;
   const description = hero?.description || commerce.settings.description;
   const productCount = commerce.products.length;
   const paymentMethod = commerce.settings.paymentOptions[0];
-  const heroTotal = Math.max(carouselProducts.length, 1);
+  const heroTotal = heroSlides.length;
 
   useEffect(() => {
-    setActiveHeroIndex((current) =>
-      carouselProducts.length ? current % carouselProducts.length : 0,
-    );
-  }, [carouselProducts.length]);
+    setActiveHeroIndex((current) => current % heroSlides.length);
+  }, []);
 
   useEffect(() => {
-    if (carouselProducts.length < 2) return undefined;
-
     const timer = window.setInterval(() => {
-      setActiveHeroIndex((current) => (current + 1) % carouselProducts.length);
+      setActiveHeroIndex((current) => (current + 1) % heroSlides.length);
     }, 5200);
 
     return () => window.clearInterval(timer);
-  }, [carouselProducts.length]);
+  }, []);
 
   const scrollToCollection = () => {
     document.getElementById('collection')?.scrollIntoView({
@@ -79,12 +86,12 @@ export default function VarelysStorefront({
 
   const showPreviousHeroProduct = () => {
     setActiveHeroIndex((current) =>
-      (current - 1 + carouselProducts.length) % carouselProducts.length,
+      (current - 1 + heroSlides.length) % heroSlides.length,
     );
   };
 
   const showNextHeroProduct = () => {
-    setActiveHeroIndex((current) => (current + 1) % carouselProducts.length);
+    setActiveHeroIndex((current) => (current + 1) % heroSlides.length);
   };
 
   return (
@@ -149,69 +156,50 @@ export default function VarelysStorefront({
             </div>
           </div>
 
-          <div className="vp3-hero-stage" aria-label="Featured scent carousel">
-            {activeHeroProduct ? (
+          <div className="vp3-hero-stage" aria-label="Varelys campaign images">
+            {activeHeroSlide ? (
               <>
                 <div className="vp3-carousel-window" aria-live="polite">
-                  <button
-                    className="vp3-hero-product-image"
-                    type="button"
-                    onClick={() => activeHeroProduct.stock > 0 && commerce.setSelected(activeHeroProduct)}
-                    disabled={activeHeroProduct.stock === 0}
-                    aria-label={`View ${activeHeroProduct.name}`}
-                  >
-                    <ProductImage src={activeHeroProduct.image} name={activeHeroProduct.name} />
-                  </button>
+                  <img
+                    className="vp3-hero-brand-image"
+                    src={activeHeroSlide.src}
+                    alt={activeHeroSlide.alt}
+                  />
                 </div>
-                <div className="vp3-hero-product-card">
-                  <span>Featured scent</span>
-                  <strong>{activeHeroProduct.name}</strong>
-                  <small>{activeHeroProduct.category}</small>
-                  <b>{money(activeHeroProduct.price)}</b>
+                <div className="vp3-carousel-controls" aria-label="Campaign image controls">
                   <button
                     type="button"
-                    onClick={() => activeHeroProduct.stock > 0 && commerce.setSelected(activeHeroProduct)}
-                    disabled={activeHeroProduct.stock === 0}
+                    onClick={showPreviousHeroProduct}
+                    aria-label="Show previous campaign image"
                   >
-                    {activeHeroProduct.stock === 0 ? 'Unavailable' : 'Discover scent'}
+                    <ChevronLeft size={17} />
                   </button>
-                </div>
-                {carouselProducts.length > 1 && (
-                  <div className="vp3-carousel-controls" aria-label="Featured scent controls">
-                    <button
-                      type="button"
-                      onClick={showPreviousHeroProduct}
-                      aria-label="Show previous scent"
-                    >
-                      <ChevronLeft size={17} />
-                    </button>
-                    <div className="vp3-carousel-dots">
-                      {carouselProducts.map((product, index) => (
-                        <button
-                          key={product.id}
-                          className={index === activeHeroIndex ? 'active' : ''}
-                          type="button"
-                          onClick={() => setActiveHeroIndex(index)}
-                          aria-label={`Show ${product.name}`}
-                          aria-current={index === activeHeroIndex ? 'true' : undefined}
-                        />
-                      ))}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={showNextHeroProduct}
-                      aria-label="Show next scent"
-                    >
-                      <ChevronRight size={17} />
-                    </button>
+                  <div className="vp3-carousel-dots">
+                    {heroSlides.map((slide, index) => (
+                      <button
+                        key={slide.src}
+                        className={index === activeHeroIndex ? 'active' : ''}
+                        type="button"
+                        onClick={() => setActiveHeroIndex(index)}
+                        aria-label={`Show campaign image ${index + 1}`}
+                        aria-current={index === activeHeroIndex ? 'true' : undefined}
+                      />
+                    ))}
                   </div>
-                )}
+                  <button
+                    type="button"
+                    onClick={showNextHeroProduct}
+                    aria-label="Show next campaign image"
+                  >
+                    <ChevronRight size={17} />
+                  </button>
+                </div>
               </>
             ) : (
               <div className="vp3-hero-empty">{view.tenant.name}</div>
             )}
             <span className="vp3-stage-index">
-              {String(activeHeroProduct ? activeHeroIndex + 1 : 1).padStart(2, '0')} / {String(heroTotal).padStart(2, '0')}
+              {String(activeHeroSlide ? activeHeroIndex + 1 : 1).padStart(2, '0')} / {String(heroTotal).padStart(2, '0')}
             </span>
           </div>
         </section>

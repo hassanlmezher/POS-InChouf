@@ -1007,8 +1007,16 @@ small {
   position: relative;
   z-index: 1;
   display: grid;
-  width: min(54%, 340px);
+  width: min(78%, 620px);
   place-items: center;
+}
+
+.vp3-hero-brand-image {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  box-shadow: 0 36px 70px rgba(23, 22, 19, 0.18);
 }
 
 .vp3-hero-product-image {
@@ -1669,13 +1677,11 @@ small {
   }
 
   .vp3-carousel-window {
-    width: min(58%, 270px);
+    width: min(86%, 420px);
   }
 
-  .vp3-hero-product-card {
-    right: 18px;
-    bottom: 18px;
-    width: min(210px, 58%);
+  .vp3-hero-brand-image {
+    max-height: 370px;
   }
 
   .vp3-carousel-controls {
