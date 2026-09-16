@@ -5965,12 +5965,78 @@ input.search-input {
 
   .commerce-varelys-perfumes.op-modal {
     width: calc(100vw - 18px) !important;
-    max-height: calc(100vh - 18px);
-    padding: 18px !important;
+    height: calc(100dvh - 18px);
+    max-height: calc(100dvh - 18px);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    overflow: hidden;
+    padding: 14px 18px 16px !important;
+  }
+
+  .commerce-varelys-perfumes.op-modal [data-slot='dialog-header'] {
+    flex: 0 0 auto;
+    gap: 6px;
+    padding-right: 34px;
+  }
+
+  .commerce-varelys-perfumes.op-modal [data-slot='dialog-title'] {
+    font-size: 23px;
+    line-height: 1.02;
+  }
+
+  .commerce-varelys-perfumes.op-modal [data-slot='dialog-description'] {
+    display: -webkit-box;
+    overflow: hidden;
+    font-size: 14px;
+    line-height: 1.25;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
   }
 
   .commerce-varelys-perfumes .product-detail-photo {
-    height: min(45vh, 310px);
+    flex: 0 0 auto;
+    height: clamp(170px, 28dvh, 235px);
+  }
+
+  .commerce-varelys-perfumes .product-detail-photo img {
+    padding: 18px;
+  }
+
+  .commerce-varelys-perfumes.op-modal .form-stack {
+    flex: 1 1 auto;
+    gap: 10px;
+    min-height: 0;
+  }
+
+  .commerce-varelys-perfumes.op-modal .section-heading {
+    align-items: center;
+    margin: 0;
+  }
+
+  .commerce-varelys-perfumes.op-modal .section-heading strong {
+    font-size: 22px !important;
+  }
+
+  .commerce-varelys-perfumes.op-modal .field {
+    gap: 7px;
+  }
+
+  .commerce-varelys-perfumes.op-modal .field label {
+    font-size: 15px;
+  }
+
+  .commerce-varelys-perfumes.op-modal .field input,
+  .commerce-varelys-perfumes.op-modal .choice-trigger {
+    min-height: 44px !important;
+  }
+
+  .commerce-varelys-perfumes.op-modal .form-actions {
+    margin-top: auto;
+  }
+
+  .commerce-varelys-perfumes.op-modal .button {
+    min-height: 46px;
   }
 
   .order-complete-actions {
