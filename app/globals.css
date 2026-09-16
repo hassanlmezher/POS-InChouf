@@ -962,6 +962,10 @@ small {
   text-decoration: none;
 }
 
+.vp3-primary-button {
+  appearance: none;
+}
+
 .vp3-primary-button:hover,
 .vp3-primary-button:focus-visible {
   background: var(--vp3-bronze);
@@ -988,14 +992,28 @@ small {
   background: var(--vp3-stone);
 }
 
-.vp3-hero-product-image {
+.vp3-carousel-window {
   position: relative;
   z-index: 1;
   display: grid;
   width: min(54%, 340px);
+  place-items: center;
+}
+
+.vp3-hero-product-image {
+  position: relative;
+  display: grid;
+  width: 100%;
   aspect-ratio: 0.78;
   place-items: center;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
   transform: translateY(-10px);
+}
+
+.vp3-hero-product-image:disabled {
+  cursor: default;
 }
 
 .vp3-hero-product-image img {
@@ -1004,6 +1022,13 @@ small {
   height: 100%;
   object-fit: contain;
   filter: drop-shadow(0 24px 22px rgba(23, 22, 19, 0.22));
+  transition: transform 260ms ease, filter 260ms ease;
+}
+
+.vp3-hero-product-image:not(:disabled):hover img,
+.vp3-hero-product-image:not(:disabled):focus-visible img {
+  filter: drop-shadow(0 30px 26px rgba(23, 22, 19, 0.26));
+  transform: translateY(-6px);
 }
 
 .vp3-hero-product-card {
@@ -1038,6 +1063,112 @@ small {
 .vp3-hero-product-card b {
   margin-top: 8px;
   font-size: 13px;
+}
+
+.vp3-hero-product-card button {
+  width: max-content;
+  margin-top: 10px;
+  padding: 0 0 4px;
+  border: 0;
+  border-bottom: 1px solid var(--vp3-ink);
+  background: transparent;
+  color: var(--vp3-ink);
+  cursor: pointer;
+  font: 700 11px/1 Inter, ui-sans-serif, sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.vp3-hero-product-card button:disabled {
+  border-bottom-color: var(--vp3-muted);
+  color: var(--vp3-muted);
+  cursor: default;
+}
+
+.vp3-carousel-controls {
+  position: absolute;
+  bottom: 32px;
+  left: clamp(20px, 4vw, 48px);
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.vp3-carousel-controls > button,
+.vp3-carousel-strip button {
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(23, 22, 19, 0.2);
+  background: rgba(251, 249, 245, 0.72);
+  color: var(--vp3-ink);
+  cursor: pointer;
+}
+
+.vp3-carousel-controls > button {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+}
+
+.vp3-carousel-controls > button:hover,
+.vp3-carousel-controls > button:focus-visible {
+  background: var(--vp3-ink);
+  color: var(--vp3-paper);
+}
+
+.vp3-carousel-dots {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.vp3-carousel-dots button {
+  display: block;
+  width: 7px;
+  height: 7px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(23, 22, 19, 0.28);
+  cursor: pointer;
+}
+
+.vp3-carousel-dots button.active {
+  background: var(--vp3-ink);
+  transform: scale(1.28);
+}
+
+.vp3-carousel-strip {
+  position: absolute;
+  top: 50%;
+  left: clamp(18px, 3vw, 38px);
+  z-index: 3;
+  display: grid;
+  gap: 10px;
+  transform: translateY(-50%);
+}
+
+.vp3-carousel-strip button {
+  width: 56px;
+  height: 68px;
+  padding: 6px;
+  border-radius: 2px;
+}
+
+.vp3-carousel-strip button.active,
+.vp3-carousel-strip button:hover,
+.vp3-carousel-strip button:focus-visible {
+  border-color: var(--vp3-ink);
+  background: var(--vp3-paper);
+  box-shadow: 0 14px 30px rgba(45, 34, 22, 0.12);
+}
+
+.vp3-carousel-strip img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .vp3-stage-index {
@@ -1554,6 +1685,10 @@ small {
   }
 
   .vp3-hero-product-image {
+    width: 100%;
+  }
+
+  .vp3-carousel-window {
     width: min(58%, 270px);
   }
 
@@ -1561,6 +1696,28 @@ small {
     right: 18px;
     bottom: 18px;
     width: min(210px, 58%);
+  }
+
+  .vp3-carousel-controls {
+    bottom: auto;
+    top: 22px;
+    left: 18px;
+  }
+
+  .vp3-carousel-strip {
+    right: 18px;
+    bottom: 118px;
+    left: auto;
+    top: auto;
+    grid-auto-flow: column;
+    max-width: calc(100% - 36px);
+    overflow-x: auto;
+    transform: none;
+  }
+
+  .vp3-carousel-strip button {
+    width: 48px;
+    height: 58px;
   }
 
   .vp3-section-heading,

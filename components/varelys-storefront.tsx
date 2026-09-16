@@ -3,13 +3,15 @@
 import {
   ArrowDownRight,
   ArrowRight,
+  ChevronLeft,
   ChevronDown,
+  ChevronRight,
   Menu,
   Search,
   ShoppingBag,
   Sparkles,
 } from 'lucide-react';
-import type { CSSProperties } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { money, type Product, type StorefrontSection } from '@/lib/types';
 import { ProductImage, EmptyState } from './shared';
 import {
@@ -41,11 +43,50 @@ export default function VarelysStorefront({
     (section) => section.type === 'deliveryInfo' && section.enabled !== false,
   );
   const products = commerce.filteredProducts;
-  const leadProduct = products[0] || commerce.products[0];
+  const carouselProducts = useMemo(
+    () => (commerce.products.length ? commerce.products : products),
+    [commerce.products, products],
+  );
+  const [activeHeroIndex, setActiveHeroIndex] = useState(0);
+  const activeHeroProduct = carouselProducts[activeHeroIndex] || carouselProducts[0];
   const title = hero?.title || commerce.settings.tagline || view.tenant.name;
   const description = hero?.description || commerce.settings.description;
   const productCount = commerce.products.length;
   const paymentMethod = commerce.settings.paymentOptions[0];
+  const heroTotal = Math.max(carouselProducts.length, 1);
+
+  useEffect(() => {
+    setActiveHeroIndex((current) =>
+      carouselProducts.length ? current % carouselProducts.length : 0,
+    );
+  }, [carouselProducts.length]);
+
+  useEffect(() => {
+    if (carouselProducts.length < 2) return undefined;
+
+    const timer = window.setInterval(() => {
+      setActiveHeroIndex((current) => (current + 1) % carouselProducts.length);
+    }, 5200);
+
+    return () => window.clearInterval(timer);
+  }, [carouselProducts.length]);
+
+  const scrollToCollection = () => {
+    document.getElementById('collection')?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
+  };
+
+  const showPreviousHeroProduct = () => {
+    setActiveHeroIndex((current) =>
+      (current - 1 + carouselProducts.length) % carouselProducts.length,
+    );
+  };
+
+  const showNextHeroProduct = () => {
+    setActiveHeroIndex((current) => (current + 1) % carouselProducts.length);
+  };
 
   return (
     <div className={`${className} vp3-store`} style={style}>
@@ -71,7 +112,7 @@ export default function VarelysStorefront({
             className="vp3-icon-button vp3-menu-button"
             type="button"
             aria-label="Open navigation"
-            onClick={() => document.getElementById('collection')?.scrollIntoView({ behavior: 'smooth' })}
+            onClick={scrollToCollection}
           >
             <Menu size={18} />
           </button>
@@ -106,32 +147,94 @@ export default function VarelysStorefront({
             <h1>{title}</h1>
             <p>{description}</p>
             <div className="vp3-hero-actions">
-              <a className="vp3-primary-button" href="#collection">
+              <button className="vp3-primary-button" type="button" onClick={scrollToCollection}>
                 Explore the collection <ArrowRight size={16} />
-              </a>
+              </button>
               <span className="vp3-hero-note">
                 {productCount} {productCount === 1 ? 'scent' : 'scents'} available
               </span>
             </div>
           </div>
 
-          <div className="vp3-hero-stage" aria-label="Featured scent">
-            {leadProduct ? (
+          <div className="vp3-hero-stage" aria-label="Featured scent carousel">
+            {activeHeroProduct ? (
               <>
-                <div className="vp3-hero-product-image">
-                  <ProductImage src={leadProduct.image} name={leadProduct.name} />
+                <div className="vp3-carousel-window" aria-live="polite">
+                  <button
+                    className="vp3-hero-product-image"
+                    type="button"
+                    onClick={() => activeHeroProduct.stock > 0 && commerce.setSelected(activeHeroProduct)}
+                    disabled={activeHeroProduct.stock === 0}
+                    aria-label={`View ${activeHeroProduct.name}`}
+                  >
+                    <ProductImage src={activeHeroProduct.image} name={activeHeroProduct.name} />
+                  </button>
                 </div>
                 <div className="vp3-hero-product-card">
                   <span>Featured scent</span>
-                  <strong>{leadProduct.name}</strong>
-                  <small>{leadProduct.category}</small>
-                  <b>{money(leadProduct.price)}</b>
+                  <strong>{activeHeroProduct.name}</strong>
+                  <small>{activeHeroProduct.category}</small>
+                  <b>{money(activeHeroProduct.price)}</b>
+                  <button
+                    type="button"
+                    onClick={() => activeHeroProduct.stock > 0 && commerce.setSelected(activeHeroProduct)}
+                    disabled={activeHeroProduct.stock === 0}
+                  >
+                    {activeHeroProduct.stock === 0 ? 'Unavailable' : 'Discover scent'}
+                  </button>
                 </div>
+                {carouselProducts.length > 1 && (
+                  <div className="vp3-carousel-controls" aria-label="Featured scent controls">
+                    <button
+                      type="button"
+                      onClick={showPreviousHeroProduct}
+                      aria-label="Show previous scent"
+                    >
+                      <ChevronLeft size={17} />
+                    </button>
+                    <div className="vp3-carousel-dots">
+                      {carouselProducts.map((product, index) => (
+                        <button
+                          key={product.id}
+                          className={index === activeHeroIndex ? 'active' : ''}
+                          type="button"
+                          onClick={() => setActiveHeroIndex(index)}
+                          aria-label={`Show ${product.name}`}
+                          aria-current={index === activeHeroIndex ? 'true' : undefined}
+                        />
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={showNextHeroProduct}
+                      aria-label="Show next scent"
+                    >
+                      <ChevronRight size={17} />
+                    </button>
+                  </div>
+                )}
+                {carouselProducts.length > 1 && (
+                  <div className="vp3-carousel-strip" aria-label="Featured scents">
+                    {carouselProducts.map((product, index) => (
+                      <button
+                        key={product.id}
+                        className={index === activeHeroIndex ? 'active' : ''}
+                        type="button"
+                        onClick={() => setActiveHeroIndex(index)}
+                        aria-label={`Feature ${product.name}`}
+                      >
+                        <ProductImage src={product.image} name={product.name} />
+                      </button>
+                    ))}
+                  </div>
+                )}
               </>
             ) : (
               <div className="vp3-hero-empty">{view.tenant.name}</div>
             )}
-            <span className="vp3-stage-index">01 / {String(Math.max(productCount, 1)).padStart(2, '0')}</span>
+            <span className="vp3-stage-index">
+              {String(activeHeroProduct ? activeHeroIndex + 1 : 1).padStart(2, '0')} / {String(heroTotal).padStart(2, '0')}
+            </span>
           </div>
         </section>
 
