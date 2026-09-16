@@ -5633,15 +5633,17 @@ input.search-input {
 .vp-sheet-brand {
   display: flex;
   justify-content: center;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .vp-sheet-brand img {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
+  width: 60px;
+  height: 60px;
+  border: 1px solid rgba(220, 210, 196, 0.8);
+  border-radius: 16px;
+  background: rgba(255, 253, 249, 0.9);
+  box-shadow: 0 8px 24px rgba(35, 28, 20, 0.08);
   object-fit: cover;
-  mix-blend-mode: multiply;
 }
 
 .commerce-varelys-perfumes [data-slot='sheet-header'] {
@@ -5988,6 +5990,16 @@ input.search-input {
   .commerce-varelys-perfumes .sheet-inner {
     min-height: 100%;
     padding: 18px 18px calc(24px + env(safe-area-inset-bottom));
+  }
+
+  .vp-sheet-brand {
+    margin-bottom: 8px;
+  }
+
+  .vp-sheet-brand img {
+    width: 54px;
+    height: 54px;
+    border-radius: 14px;
   }
 
   .commerce-varelys-perfumes [data-slot='sheet-title'],
