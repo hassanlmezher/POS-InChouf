@@ -130,9 +130,11 @@ export default function VarelysStorefront({
             onClick={() => commerce.setCartOpen(true)}
             aria-label={`Open bag, ${commerce.count} items`}
           >
-            <ShoppingBag size={18} />
-            <span>Bag</span>
-            <b>{commerce.count}</b>
+            <span className="vp3-bag-icon" aria-hidden="true">
+              <ShoppingBag size={18} />
+              <span className="vp3-bag-count">{commerce.count}</span>
+            </span>
+            <span className="vp3-bag-label">Bag</span>
           </button>
         </div>
       </header>
@@ -211,21 +213,6 @@ export default function VarelysStorefront({
                     >
                       <ChevronRight size={17} />
                     </button>
-                  </div>
-                )}
-                {carouselProducts.length > 1 && (
-                  <div className="vp3-carousel-strip" aria-label="Featured scents">
-                    {carouselProducts.map((product, index) => (
-                      <button
-                        key={product.id}
-                        className={index === activeHeroIndex ? 'active' : ''}
-                        type="button"
-                        onClick={() => setActiveHeroIndex(index)}
-                        aria-label={`Feature ${product.name}`}
-                      >
-                        <ProductImage src={product.image} name={product.name} />
-                      </button>
-                    ))}
                   </div>
                 )}
               </>
