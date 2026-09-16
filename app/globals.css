@@ -5628,8 +5628,10 @@ input.search-input {
 }
 
 .vp-sheet-brand img {
-  width: 98px;
-  height: auto;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  object-fit: cover;
   mix-blend-mode: multiply;
 }
 
