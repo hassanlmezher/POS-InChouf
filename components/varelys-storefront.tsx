@@ -148,11 +148,20 @@ export default function VarelysStorefront({
             {activeHeroSlide ? (
               <>
                 <div className="vp3-carousel-window" aria-live="polite">
-                  <img
-                    className="vp3-hero-brand-image"
-                    src={activeHeroSlide.src}
-                    alt={activeHeroSlide.alt}
-                  />
+                  <div
+                    className="vp3-carousel-track"
+                    style={{ transform: `translateX(-${activeHeroIndex * 100}%)` }}
+                  >
+                    {heroSlides.map((slide, index) => (
+                      <img
+                        key={slide.src}
+                        className="vp3-hero-brand-image"
+                        src={slide.src}
+                        alt={index === activeHeroIndex ? slide.alt : ''}
+                        aria-hidden={index === activeHeroIndex ? undefined : true}
+                      />
+                    ))}
+                  </div>
                 </div>
                 <div className="vp3-carousel-controls" aria-label="Campaign image slides">
                   <div className="vp3-carousel-dots">
