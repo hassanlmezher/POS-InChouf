@@ -47,10 +47,6 @@ export default function VarelysStorefront({
   const hero = sections.find(
     (section) => section.type === 'hero' && section.enabled !== false,
   );
-  const collection = sections.find(
-    (section) =>
-      section.type === 'featuredProducts' && section.enabled !== false,
-  );
   const delivery = sections.find(
     (section) => section.type === 'deliveryInfo' && section.enabled !== false,
   );
@@ -188,14 +184,6 @@ export default function VarelysStorefront({
         </section>
 
         <section className="vp3-collection" id="collection">
-          <div className="vp3-section-heading">
-            <div>
-              <span className="vp3-overline">The edit</span>
-              <h2>{collection?.title || 'The collection'}</h2>
-            </div>
-            <p>{collection?.description || commerce.settings.description}</p>
-          </div>
-
           <div className="vp3-catalog-toolbar">
             <div className="vp3-category-list" aria-label="Filter by category">
               {commerce.categories.map((category) => (
