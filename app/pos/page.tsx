@@ -1204,6 +1204,7 @@ export default function Pos() {
         <OrderDetail
           id={selected}
           user={user}
+          deliveryProviders={tenantSettings.deliveryProviders}
           onClose={() => setSelected(null)}
           onSaved={refresh}
         />

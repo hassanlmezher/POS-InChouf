@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Sheet,
   SheetContent,
@@ -20,11 +20,13 @@ import { money, type Detail, type User } from '@/lib/types';
 export default function OrderDetail({
   id,
   user,
+  deliveryProviders,
   onClose,
   onSaved,
 }: {
   id: string;
   user: User;
+  deliveryProviders: string[];
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -41,14 +43,40 @@ export default function OrderDetail({
     [deliveryProvider, setDeliveryProvider] = useState('');
   const o = r.data?.order;
   const manager = ['owner', 'order_manager'].includes(user.role);
+  const deliveryProviderOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          deliveryProviders.map((provider) => provider.trim()).filter(Boolean),
+        ),
+      ),
+    [deliveryProviders],
+  );
   const orderId = o?.id;
   const orderDeliveryMethod = o?.deliveryMethod;
   const orderDeliveryProvider = o?.deliveryProvider;
   useEffect(() => {
     if (!orderId) return;
-    setDeliveryMethod(orderDeliveryMethod || 'internal_driver');
-    setDeliveryProvider(orderDeliveryProvider || '');
-  }, [orderId, orderDeliveryMethod, orderDeliveryProvider]);
+    const nextMethod = orderDeliveryMethod || 'internal_driver';
+    const nextProvider = orderDeliveryProvider?.trim() || '';
+    setDeliveryMethod(nextMethod);
+    setDeliveryProvider(
+      nextMethod === 'external_courier'
+        ? deliveryProviderOptions.includes(nextProvider)
+          ? nextProvider
+          : deliveryProviderOptions[0] || ''
+        : '',
+    );
+  }, [
+    orderId,
+    orderDeliveryMethod,
+    orderDeliveryProvider,
+    deliveryProviderOptions,
+  ]);
+  const externalCourierInvalid =
+    deliveryMethod === 'external_courier' &&
+    (!deliveryProvider ||
+      !deliveryProviderOptions.includes(deliveryProvider.trim()));
   const save = async (data: Record<string, unknown>) => {
     if (!o) return;
     setBusy(true);
@@ -158,11 +186,20 @@ export default function OrderDetail({
                           <Choice
                             label="Delivery method"
                             value={deliveryMethod}
-                            onChange={(v) =>
-                              setDeliveryMethod(
-                                v as 'internal_driver' | 'external_courier',
-                              )
-                            }
+                            onChange={(v) => {
+                              const next =
+                                v as 'internal_driver' | 'external_courier';
+                              setDeliveryMethod(next);
+                              setDeliveryProvider(
+                                next === 'external_courier'
+                                  ? deliveryProviderOptions.includes(
+                                      deliveryProvider,
+                                    )
+                                    ? deliveryProvider
+                                    : deliveryProviderOptions[0] || ''
+                                  : '',
+                              );
+                            }}
                             options={[
                               {
                                 value: 'internal_driver',
@@ -175,20 +212,26 @@ export default function OrderDetail({
                             ]}
                           />
                           {deliveryMethod === 'external_courier' && (
-                            <Field label="External courier">
-                              <input
-                                value={deliveryProvider}
-                                maxLength={120}
-                                placeholder="Courier or delivery company"
-                                onChange={(e) =>
-                                  setDeliveryProvider(e.target.value)
-                                }
-                              />
-                            </Field>
+                            <>
+                              {deliveryProviderOptions.length ? (
+                                <Choice
+                                  label="External courier"
+                                  value={deliveryProvider}
+                                  onChange={setDeliveryProvider}
+                                  options={deliveryProviderOptions}
+                                />
+                              ) : (
+                                <small className="danger-text">
+                                  Add external courier companies in Storefront
+                                  settings before using external delivery.
+                                </small>
+                              )}
+                            </>
                           )}
                           <ActionButton
                             className="button secondary small"
                             busy={busy}
+                            disabled={externalCourierInvalid}
                             onClick={() =>
                               save({
                                 deliveryMethod,
