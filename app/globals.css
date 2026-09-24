@@ -1257,6 +1257,63 @@ small {
   pointer-events: none;
 }
 
+.vp3-scroll-story {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.vp3-scroll-story-card {
+  position: absolute;
+  right: clamp(20px, 5vw, 72px);
+  top: 50%;
+  width: min(360px, calc(100% - 40px));
+  min-height: 220px;
+  padding: 24px 26px;
+  border: 1px solid rgba(251, 249, 245, 0.45);
+  background: rgba(251, 249, 245, 0.76);
+  box-shadow: 0 24px 70px rgba(23, 22, 19, 0.16);
+  color: var(--vp3-ink);
+  opacity: 0;
+  transform: translate3d(0, 18px, 0);
+  visibility: hidden;
+  will-change: opacity, transform;
+  -webkit-backdrop-filter: blur(18px) saturate(130%);
+  backdrop-filter: blur(18px) saturate(130%);
+}
+
+.vp3-story-count,
+.vp3-story-eyebrow {
+  display: block;
+  color: var(--vp3-bronze);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.vp3-story-eyebrow {
+  margin-top: 28px;
+}
+
+.vp3-scroll-story-card h2 {
+  margin: 12px 0 0;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(28px, 3.6vw, 46px);
+  font-weight: 400;
+  line-height: 0.98;
+  letter-spacing: 0;
+}
+
+.vp3-scroll-story-card p {
+  margin: 18px 0 0;
+  color: var(--vp3-muted);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 16px;
+  line-height: 1.45;
+}
+
 .vp3-collection {
   padding: clamp(56px, 8vw, 112px) clamp(20px, 6vw, 88px);
   background: var(--vp3-paper);
@@ -1823,6 +1880,48 @@ small {
     min-height: 2300px;
   }
 
+  .vp3-scroll-story {
+    display: grid;
+    align-items: end;
+    padding: 0 14px calc(18px + env(safe-area-inset-bottom));
+  }
+
+  .vp3-scroll-story-card {
+    right: 14px;
+    bottom: calc(18px + env(safe-area-inset-bottom));
+    left: 14px;
+    top: auto;
+    width: auto;
+    min-height: 0;
+    padding: 14px 15px 15px;
+    border-color: rgba(216, 206, 193, 0.78);
+    background: rgba(251, 249, 245, 0.84);
+    box-shadow: 0 14px 38px rgba(23, 22, 19, 0.13);
+  }
+
+  .vp3-story-count,
+  .vp3-story-eyebrow {
+    font-size: 8px;
+    letter-spacing: 0.15em;
+  }
+
+  .vp3-story-eyebrow {
+    margin-top: 12px;
+  }
+
+  .vp3-scroll-story-card h2 {
+    max-width: 310px;
+    margin-top: 7px;
+    font-size: 24px;
+    line-height: 1.02;
+  }
+
+  .vp3-scroll-story-card p {
+    margin-top: 9px;
+    font-size: 13px;
+    line-height: 1.35;
+  }
+
   .vp3-section-heading,
   .vp3-catalog-toolbar,
   .vp3-details,
@@ -1906,6 +2005,17 @@ small {
 
   .vp3-scroll-film-canvas {
     transition: none;
+  }
+
+  .vp3-scroll-story-card {
+    display: none;
+  }
+
+  .vp3-scroll-story-card:last-child {
+    display: block;
+    opacity: 1 !important;
+    transform: none !important;
+    visibility: visible !important;
   }
 
   * {

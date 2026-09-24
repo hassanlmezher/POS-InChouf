@@ -38,15 +38,44 @@ export default function VarelysStorefront({
 
 const SCROLL_FILM_SRC = '/brand/varelys-scroll-mist.mp4';
 
+const productStory = [
+  {
+    at: 0.07,
+    eyebrow: 'Noir 07',
+    title: 'Warm amber, close to skin.',
+    body: 'A polished amber perfume built around soft resin, clean woods and a quiet musk finish.',
+  },
+  {
+    at: 0.32,
+    eyebrow: 'The Spray',
+    title: 'A fine mist with a gentle trail.',
+    body: 'The atomizer releases a controlled cloud, so the scent opens evenly instead of arriving all at once.',
+  },
+  {
+    at: 0.58,
+    eyebrow: 'The Bottle',
+    title: 'Weighted glass, clear edges.',
+    body: 'The square bottle is designed to feel substantial in hand while keeping the amber liquid visible from every angle.',
+  },
+  {
+    at: 0.93,
+    eyebrow: 'The Drydown',
+    title: 'Smooth, warm, lasting.',
+    body: 'Noir 07 settles into polished woods and soft musk: refined enough for evening, easy enough for every day.',
+  },
+];
+
 function VarelysScrollFilm() {
   const sectionRef = useRef<HTMLElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const storyRefs = useRef<Array<HTMLDivElement | null>>([]);
   const frameRef = useRef<number | null>(null);
   const targetTimeRef = useRef(0);
   const displayTimeRef = useRef(0);
   const durationRef = useRef(0);
+  const progressRef = useRef(0);
   const pendingSeekTimeRef = useRef(0);
   const lastSeekTimeRef = useRef(-1);
   const seekingRef = useRef(false);
@@ -62,6 +91,25 @@ function VarelysScrollFilm() {
     if (!section || !stage || !canvas || !video) return;
 
     let mounted = true;
+
+    const updateStory = (progress: number) => {
+      progressRef.current = progress;
+      stage.style.setProperty('--film-progress', progress.toFixed(4));
+
+      storyRefs.current.forEach((item, index) => {
+        if (!item) return;
+        const stop = productStory[index]?.at ?? 0;
+        const distance = Math.abs(progress - stop);
+        const rawOpacity = Math.max(0, 1 - distance / 0.19);
+        const opacity = rawOpacity * rawOpacity * (3 - 2 * rawOpacity);
+        const direction = progress >= stop ? -1 : 1;
+        const lift = direction * (1 - opacity) * 18;
+
+        item.style.opacity = opacity.toFixed(3);
+        item.style.transform = `translate3d(0, ${lift.toFixed(2)}px, 0) scale(${(0.985 + opacity * 0.015).toFixed(3)})`;
+        item.style.visibility = opacity > 0.035 ? 'visible' : 'hidden';
+      });
+    };
 
     const setCanvasSize = () => {
       const rect = stage.getBoundingClientRect();
@@ -97,13 +145,17 @@ function VarelysScrollFilm() {
     };
 
     const targetTimeFromScroll = () => {
-      if (!durationRef.current || reducedMotionRef.current) return durationRef.current;
+      if (!durationRef.current || reducedMotionRef.current) {
+        updateStory(1);
+        return durationRef.current;
+      }
 
       const scrollDistance = Math.max(1, section.offsetHeight - window.innerHeight);
       const progress = Math.min(
         1,
         Math.max(0, -section.getBoundingClientRect().top / scrollDistance),
       );
+      updateStory(progress);
       return durationRef.current * progress;
     };
 
@@ -192,6 +244,7 @@ function VarelysScrollFilm() {
         pendingSeekTimeRef.current = durationRef.current;
         lastSeekTimeRef.current = -1;
         seekingRef.current = false;
+        updateStory(1);
         seekVideo(durationRef.current);
         drawFrame();
       } else {
@@ -210,6 +263,7 @@ function VarelysScrollFilm() {
     motionQuery.addEventListener('change', applyMotionPreference);
 
     applyMotionPreference();
+    updateStory(reducedMotionRef.current ? 1 : 0);
     if (video.readyState >= HTMLMediaElement.HAVE_METADATA) handleReady();
     video.load();
     frameRef.current = window.requestAnimationFrame(tick);
@@ -251,6 +305,24 @@ function VarelysScrollFilm() {
             ref={videoRef}
             src={SCROLL_FILM_SRC}
           />
+          <div className="vp3-scroll-story" aria-live="polite">
+            {productStory.map((item, index) => (
+              <div
+                className="vp3-scroll-story-card"
+                key={item.eyebrow}
+                ref={(node) => {
+                  storyRefs.current[index] = node;
+                }}
+              >
+                <span className="vp3-story-count">
+                  {String(index + 1).padStart(2, '0')} / {String(productStory.length).padStart(2, '0')}
+                </span>
+                <span className="vp3-story-eyebrow">{item.eyebrow}</span>
+                <h2>{item.title}</h2>
+                <p>{item.body}</p>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </section>
