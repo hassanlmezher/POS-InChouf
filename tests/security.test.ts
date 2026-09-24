@@ -1620,12 +1620,14 @@ void test('order proof and reference upload endpoints are removed', async () => 
 });
 
 void test('security helpers and CSV export retain their non-database guarantees', () => {
+  assert.equal(hostTenant('perfume.inchouf.com'), 'varelysperfumes');
   assert.equal(hostTenant('varelysperfumes.inchouf.com'), 'varelysperfumes');
   assert.equal(hostTenant('internal-demo.inchouf.com'), null);
   assert.equal(hostTenant('app.inchouf.com'), null);
   assert.equal(validHost(temporaryWorkerHost, 'inchouf.com'), true);
   assert.equal(validHost('untrusted.workers.dev', 'inchouf.com'), false);
   assert.equal(validHost('admin.inchouf.com', 'inchouf.com'), true);
+  assert.equal(validHost('perfume.inchouf.com', 'inchouf.com'), true);
   assert.equal(validHost('varelysperfumes.inchouf.com', 'inchouf.com'), true);
   assert.equal(validHost('business.inchouf.com', 'inchouf.com'), false);
   assert.deepEqual(parseCSV('a,b\n"hello, world","a""b"'), [

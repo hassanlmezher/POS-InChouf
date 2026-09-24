@@ -36,12 +36,13 @@ export const reserved = [
 ];
 export const temporaryWorkerHost = 'pos-inchouf.hassanmezher084.workers.dev';
 export const publicStoreSlug = 'varelysperfumes';
-export const publicStoreHost = `${publicStoreSlug}.inchouf.com`;
+export const publicStoreHost = 'perfume.inchouf.com';
+export const publicStoreHosts = [publicStoreHost, `${publicStoreSlug}.inchouf.com`];
 export const adminHost = 'admin.inchouf.com';
 
 export function hostTenant(host: string) {
   const hostname = host.toLowerCase().split(':')[0];
-  if (hostname === publicStoreHost) return publicStoreSlug;
+  if (publicStoreHosts.includes(hostname)) return publicStoreSlug;
   return null;
 }
 
@@ -54,7 +55,7 @@ export function validHost(host: string, siteHost?: string) {
     h === 'inchouf.com' ||
     h === 'www.inchouf.com' ||
     h === adminHost ||
-    h === publicStoreHost ||
+    publicStoreHosts.includes(h) ||
     h === configuredHost ||
     h === temporaryWorkerHost
   );

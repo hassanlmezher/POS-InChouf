@@ -1189,6 +1189,80 @@ small {
   font-size: 32px;
 }
 
+.vp3-scroll-film {
+  position: relative;
+  height: 430vh;
+  min-height: 2600px;
+  border-bottom: 1px solid var(--vp3-line);
+  background: var(--vp3-ink);
+}
+
+.vp3-scroll-film-sticky {
+  position: sticky;
+  top: 0;
+  display: grid;
+  min-height: 100vh;
+  min-height: 100svh;
+  place-items: center;
+  overflow: hidden;
+}
+
+.vp3-scroll-film-stage {
+  position: relative;
+  display: grid;
+  width: 100%;
+  height: 100vh;
+  height: 100svh;
+  place-items: center;
+  overflow: hidden;
+  background: var(--vp3-ink);
+}
+
+.vp3-scroll-film-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 340ms ease;
+}
+
+.vp3-scroll-film.is-ready .vp3-scroll-film-canvas {
+  opacity: 1;
+}
+
+.vp3-scroll-film-video {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.vp3-scroll-film-copy {
+  position: absolute;
+  right: clamp(20px, 6vw, 82px);
+  bottom: clamp(26px, 7vw, 86px);
+  z-index: 2;
+  max-width: min(360px, calc(100% - 40px));
+  color: var(--vp3-paper);
+  text-align: right;
+  text-shadow: 0 1px 22px rgba(0, 0, 0, 0.28);
+}
+
+.vp3-scroll-film-copy .vp3-overline {
+  color: #d1aa77;
+}
+
+.vp3-scroll-film-copy h2 {
+  margin: 14px 0 0;
+  color: var(--vp3-paper);
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(34px, 6vw, 72px);
+  font-weight: 400;
+  line-height: 0.98;
+  letter-spacing: 0;
+}
+
 .vp3-collection {
   padding: clamp(56px, 8vw, 112px) clamp(20px, 6vw, 88px);
   background: var(--vp3-paper);
@@ -1731,6 +1805,24 @@ small {
     left: 50%;
   }
 
+  .vp3-scroll-film {
+    height: 380vh;
+    min-height: 2100px;
+  }
+
+  .vp3-scroll-film-copy {
+    right: 20px;
+    bottom: 28px;
+    left: 20px;
+    max-width: none;
+    text-align: left;
+  }
+
+  .vp3-scroll-film-copy h2 {
+    max-width: 300px;
+    font-size: 38px;
+  }
+
   .vp3-section-heading,
   .vp3-catalog-toolbar,
   .vp3-details,
@@ -1801,6 +1893,21 @@ small {
   }
 }
 @media (prefers-reduced-motion: reduce) {
+  .vp3-scroll-film {
+    height: auto;
+    min-height: 0;
+  }
+
+  .vp3-scroll-film-sticky {
+    position: relative;
+    min-height: 100vh;
+    min-height: 100svh;
+  }
+
+  .vp3-scroll-film-canvas {
+    transition: none;
+  }
+
   * {
     animation: none !important;
     scroll-behavior: auto !important;

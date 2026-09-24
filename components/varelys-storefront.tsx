@@ -8,7 +8,7 @@ import {
   ShoppingBag,
   Sparkles,
 } from 'lucide-react';
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { money, type Product, type StorefrontSection } from '@/lib/types';
 import { ProductImage, EmptyState } from './shared';
 import {
@@ -92,6 +92,7 @@ export default function VarelysStorefront({
         </a>
 
         <nav className="vp3-nav" aria-label="Storefront navigation">
+          <a href="#scent-film">Scent film</a>
           <a href="#collection">Collection</a>
           <a href="#the-house">The house</a>
           <a href="#delivery">Delivery</a>
@@ -182,6 +183,8 @@ export default function VarelysStorefront({
             </span>
           </div>
         </section>
+
+        <VarelysScrollFilm />
 
         <section className="vp3-collection" id="collection">
           <div className="vp3-catalog-toolbar">
@@ -321,6 +324,196 @@ export default function VarelysStorefront({
 
       <StorefrontCommerceChrome commerce={commerce} />
     </div>
+  );
+}
+
+const SCROLL_FILM_SRC = '/brand/varelys-scroll-mist.mp4';
+
+function VarelysScrollFilm() {
+  const sectionRef = useRef<HTMLElement | null>(null);
+  const stageRef = useRef<HTMLDivElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const frameRef = useRef<number | null>(null);
+  const targetTimeRef = useRef(0);
+  const displayTimeRef = useRef(0);
+  const durationRef = useRef(0);
+  const reducedMotionRef = useRef(false);
+  const [ready, setReady] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(false);
+
+  useEffect(() => {
+    const section = sectionRef.current;
+    const stage = stageRef.current;
+    const canvas = canvasRef.current;
+    const video = videoRef.current;
+    if (!section || !stage || !canvas || !video) return;
+
+    let mounted = true;
+
+    const setCanvasSize = () => {
+      const rect = stage.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const width = Math.max(1, Math.round(rect.width * dpr));
+      const height = Math.max(1, Math.round(rect.height * dpr));
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+      }
+    };
+
+    const drawFrame = () => {
+      const context = canvas.getContext('2d');
+      if (!context || !video.videoWidth || !video.videoHeight) return;
+
+      setCanvasSize();
+
+      const canvasWidth = canvas.width;
+      const canvasHeight = canvas.height;
+      const videoWidth = video.videoWidth;
+      const videoHeight = video.videoHeight;
+      const useContain = window.matchMedia('(max-width: 640px)').matches;
+      const scale = useContain
+        ? Math.min(canvasWidth / videoWidth, canvasHeight / videoHeight)
+        : Math.max(canvasWidth / videoWidth, canvasHeight / videoHeight);
+      const drawWidth = videoWidth * scale;
+      const drawHeight = videoHeight * scale;
+      const drawX = (canvasWidth - drawWidth) / 2;
+      const drawY = (canvasHeight - drawHeight) / 2;
+
+      context.clearRect(0, 0, canvasWidth, canvasHeight);
+      context.fillStyle = '#171613';
+      context.fillRect(0, 0, canvasWidth, canvasHeight);
+      context.drawImage(video, drawX, drawY, drawWidth, drawHeight);
+    };
+
+    const targetTimeFromScroll = () => {
+      if (!durationRef.current || reducedMotionRef.current) return durationRef.current;
+
+      const scrollDistance = Math.max(1, section.offsetHeight - window.innerHeight);
+      const progress = Math.min(
+        1,
+        Math.max(0, -section.getBoundingClientRect().top / scrollDistance),
+      );
+      return durationRef.current * progress;
+    };
+
+    const updateTargetTime = () => {
+      targetTimeRef.current = targetTimeFromScroll();
+    };
+
+    const handleResize = () => {
+      updateTargetTime();
+      drawFrame();
+    };
+
+    const seekVideo = (time: number) => {
+      if (!Number.isFinite(time)) return;
+      try {
+        video.currentTime = Math.min(durationRef.current, Math.max(0, time));
+      } catch {
+        video.currentTime = Math.max(0, durationRef.current - 0.04);
+      }
+    };
+
+    const tick = () => {
+      if (!mounted) return;
+
+      updateTargetTime();
+      const target = targetTimeRef.current;
+      const current = displayTimeRef.current;
+      const delta = target - current;
+      const next =
+        Math.abs(delta) < 0.018 || reducedMotionRef.current
+          ? target
+          : current + delta * 0.16;
+
+      displayTimeRef.current = next;
+      seekVideo(next);
+      drawFrame();
+      frameRef.current = window.requestAnimationFrame(tick);
+    };
+
+    const handleReady = () => {
+      durationRef.current = Number.isFinite(video.duration) ? video.duration : 0;
+      updateTargetTime();
+      displayTimeRef.current = targetTimeRef.current;
+      seekVideo(displayTimeRef.current);
+      drawFrame();
+      if (mounted) setReady(true);
+    };
+
+    const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const applyMotionPreference = () => {
+      reducedMotionRef.current = motionQuery.matches;
+      setReducedMotion(motionQuery.matches);
+      if (motionQuery.matches && durationRef.current) {
+        targetTimeRef.current = durationRef.current;
+        displayTimeRef.current = durationRef.current;
+        seekVideo(durationRef.current);
+        drawFrame();
+      } else {
+        updateTargetTime();
+      }
+    };
+
+    video.pause();
+    video.preload = 'auto';
+    video.addEventListener('loadedmetadata', handleReady);
+    video.addEventListener('loadeddata', handleReady);
+    video.addEventListener('seeked', drawFrame);
+    window.addEventListener('scroll', updateTargetTime, { passive: true });
+    window.addEventListener('resize', handleResize);
+    motionQuery.addEventListener('change', applyMotionPreference);
+
+    applyMotionPreference();
+    if (video.readyState >= HTMLMediaElement.HAVE_METADATA) handleReady();
+    video.load();
+    frameRef.current = window.requestAnimationFrame(tick);
+
+    return () => {
+      mounted = false;
+      if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
+      video.removeEventListener('loadedmetadata', handleReady);
+      video.removeEventListener('loadeddata', handleReady);
+      video.removeEventListener('seeked', drawFrame);
+      window.removeEventListener('scroll', updateTargetTime);
+      window.removeEventListener('resize', handleResize);
+      motionQuery.removeEventListener('change', applyMotionPreference);
+    };
+  }, []);
+
+  return (
+    <section
+      className={`vp3-scroll-film${ready ? ' is-ready' : ''}${reducedMotion ? ' is-reduced-motion' : ''}`}
+      id="scent-film"
+      ref={sectionRef}
+      aria-label="Perfume bottle reveal"
+    >
+      <div className="vp3-scroll-film-sticky">
+        <div className="vp3-scroll-film-stage" ref={stageRef}>
+          <canvas
+            className="vp3-scroll-film-canvas"
+            ref={canvasRef}
+            aria-label="A perfume bottle rotating through mist."
+            role="img"
+          />
+          <video
+            aria-hidden="true"
+            className="vp3-scroll-film-video"
+            muted
+            playsInline
+            preload="auto"
+            ref={videoRef}
+            src={SCROLL_FILM_SRC}
+          />
+          <div className="vp3-scroll-film-copy">
+            <span className="vp3-overline">Scent film</span>
+            <h2>Vapour, glass, arrival.</h2>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 

@@ -11,7 +11,11 @@ const localBindingConfig = {
   main: 'vinext/server/fetch-handler',
 };
 
-const allowedHosts = ['admin.inchouf.com', 'varelysperfumes.inchouf.com'];
+const allowedHosts = [
+  'admin.inchouf.com',
+  'perfume.inchouf.com',
+  'varelysperfumes.inchouf.com',
+];
 
 export default defineConfig(async () => {
   // Keep Wrangler and Miniflare state project-local. These are non-secret tool
