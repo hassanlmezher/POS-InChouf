@@ -338,6 +338,9 @@ function VarelysScrollFilm() {
   const targetTimeRef = useRef(0);
   const displayTimeRef = useRef(0);
   const durationRef = useRef(0);
+  const pendingSeekTimeRef = useRef(0);
+  const lastSeekTimeRef = useRef(-1);
+  const seekingRef = useRef(false);
   const reducedMotionRef = useRef(false);
   const [ready, setReady] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
@@ -409,10 +412,34 @@ function VarelysScrollFilm() {
 
     const seekVideo = (time: number) => {
       if (!Number.isFinite(time)) return;
+      const clampedTime = Math.min(durationRef.current, Math.max(0, time));
+      if (
+        seekingRef.current ||
+        Math.abs(clampedTime - lastSeekTimeRef.current) < 0.012
+      )
+        return;
+
+      if (Math.abs(video.currentTime - clampedTime) < 0.012) {
+        lastSeekTimeRef.current = clampedTime;
+        drawFrame();
+        return;
+      }
+
+      seekingRef.current = true;
+      lastSeekTimeRef.current = clampedTime;
       try {
-        video.currentTime = Math.min(durationRef.current, Math.max(0, time));
+        video.currentTime = clampedTime;
       } catch {
         video.currentTime = Math.max(0, durationRef.current - 0.04);
+      }
+      if (!video.seeking) window.requestAnimationFrame(flushPendingSeek);
+    };
+
+    const flushPendingSeek = () => {
+      seekingRef.current = false;
+      drawFrame();
+      if (Math.abs(pendingSeekTimeRef.current - lastSeekTimeRef.current) >= 0.012) {
+        seekVideo(pendingSeekTimeRef.current);
       }
     };
 
@@ -423,14 +450,17 @@ function VarelysScrollFilm() {
       const target = targetTimeRef.current;
       const current = displayTimeRef.current;
       const delta = target - current;
+      const nearTimelineEdge =
+        target < 0.045 || durationRef.current - target < 0.045;
       const next =
-        Math.abs(delta) < 0.018 || reducedMotionRef.current
+        Math.abs(delta) < 0.018 || nearTimelineEdge || reducedMotionRef.current
           ? target
-          : current + delta * 0.16;
+          : current + delta * 0.28;
 
       displayTimeRef.current = next;
+      pendingSeekTimeRef.current = next;
       seekVideo(next);
-      drawFrame();
+      if (!seekingRef.current) drawFrame();
       frameRef.current = window.requestAnimationFrame(tick);
     };
 
@@ -438,6 +468,9 @@ function VarelysScrollFilm() {
       durationRef.current = Number.isFinite(video.duration) ? video.duration : 0;
       updateTargetTime();
       displayTimeRef.current = targetTimeRef.current;
+      pendingSeekTimeRef.current = displayTimeRef.current;
+      lastSeekTimeRef.current = -1;
+      seekingRef.current = false;
       seekVideo(displayTimeRef.current);
       drawFrame();
       if (mounted) setReady(true);
@@ -450,6 +483,9 @@ function VarelysScrollFilm() {
       if (motionQuery.matches && durationRef.current) {
         targetTimeRef.current = durationRef.current;
         displayTimeRef.current = durationRef.current;
+        pendingSeekTimeRef.current = durationRef.current;
+        lastSeekTimeRef.current = -1;
+        seekingRef.current = false;
         seekVideo(durationRef.current);
         drawFrame();
       } else {
@@ -461,7 +497,8 @@ function VarelysScrollFilm() {
     video.preload = 'auto';
     video.addEventListener('loadedmetadata', handleReady);
     video.addEventListener('loadeddata', handleReady);
-    video.addEventListener('seeked', drawFrame);
+    video.addEventListener('seeked', flushPendingSeek);
+    video.addEventListener('timeupdate', drawFrame);
     window.addEventListener('scroll', updateTargetTime, { passive: true });
     window.addEventListener('resize', handleResize);
     motionQuery.addEventListener('change', applyMotionPreference);
@@ -476,7 +513,8 @@ function VarelysScrollFilm() {
       if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
       video.removeEventListener('loadedmetadata', handleReady);
       video.removeEventListener('loadeddata', handleReady);
-      video.removeEventListener('seeked', drawFrame);
+      video.removeEventListener('seeked', flushPendingSeek);
+      video.removeEventListener('timeupdate', drawFrame);
       window.removeEventListener('scroll', updateTargetTime);
       window.removeEventListener('resize', handleResize);
       motionQuery.removeEventListener('change', applyMotionPreference);
