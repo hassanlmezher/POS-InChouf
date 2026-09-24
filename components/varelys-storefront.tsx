@@ -84,10 +84,7 @@ function VarelysScrollFilm() {
       const canvasHeight = canvas.height;
       const videoWidth = video.videoWidth;
       const videoHeight = video.videoHeight;
-      const useContain = window.matchMedia('(max-width: 640px)').matches;
-      const scale = useContain
-        ? Math.min(canvasWidth / videoWidth, canvasHeight / videoHeight)
-        : Math.max(canvasWidth / videoWidth, canvasHeight / videoHeight);
+      const scale = Math.max(canvasWidth / videoWidth, canvasHeight / videoHeight);
       const drawWidth = videoWidth * scale;
       const drawHeight = videoHeight * scale;
       const drawX = (canvasWidth - drawWidth) / 2;
@@ -254,10 +251,6 @@ function VarelysScrollFilm() {
             ref={videoRef}
             src={SCROLL_FILM_SRC}
           />
-          <div className="vp3-scroll-film-copy">
-            <span className="vp3-overline">Scent film</span>
-            <h2>Vapour, glass, arrival.</h2>
-          </div>
         </div>
       </div>
     </section>
